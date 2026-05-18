@@ -18,6 +18,17 @@ class AstroValidationError(BlogManagerError):
 class GitHubClientError(BlogManagerError):
     """Raised when GitHub API interaction fails."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        operation: str = "",
+    ):
+        super().__init__(message)
+        self.status_code = status_code
+        self.operation = operation
+
 
 class MediaDownloadError(BlogManagerError):
     """Raised when remote media cannot be downloaded or normalized."""

@@ -28,6 +28,9 @@ class PublishService:
         draft: AstroArticleDraft,
     ) -> PublishResult:
         client = self._build_client()
+        await client.verify_repository_access(
+            str(self.config.get("default_branch", "main")).strip() or "main"
+        )
         repository_service = RepositoryService(client, self.config)
         draft.frontmatter = build_frontmatter(self.config, request, draft)
         draft.rendered_content = render_markdown_document(draft.frontmatter, draft.body)

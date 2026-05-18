@@ -41,6 +41,12 @@ class BlogService:
             value = self.config.get(key, "")
             state = "OK" if value not in ("", None, []) else "MISSING"
             lines.append(f"{key}: {state}")
+        lines.append(
+            "repo_target: "
+            f"{self.config.get('github_owner', '')}/{self.config.get('github_repo', '')}"
+        )
+        lines.append(f"default_branch_value: {self.config.get('default_branch', '')}")
+        lines.append(f"write_mode_value: {self.config.get('write_mode', '')}")
         required_frontmatter = self.config.get(
             "required_frontmatter_fields", DEFAULT_REQUIRED_FRONTMATTER_FIELDS
         )
