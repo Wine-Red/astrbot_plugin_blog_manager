@@ -4,8 +4,7 @@
     "type": "string",
     "default": "",
     "hint": "需要至少具备目标博客仓库的内容写入权限。",
-    "obvious_hint": true,
-    "invisible": true
+    "obvious_hint": true
   },
   "github_owner": {
     "description": "目标博客仓库 owner",
