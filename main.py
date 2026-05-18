@@ -1,10 +1,17 @@
 from __future__ import annotations
 
-from typing import Any
+import sys
+from pathlib import Path
 
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, MessageEventResult, filter
 from astrbot.api.star import Context, Star, register
+
+# AstrBot 在某些加载方式下不会自动把插件根目录加入 sys.path，
+# 这里显式注入一次，确保可以导入同目录下的业务包。
+PLUGIN_ROOT = Path(__file__).resolve().parent
+if str(PLUGIN_ROOT) not in sys.path:
+    sys.path.insert(0, str(PLUGIN_ROOT))
 
 from astrbot_plugin_blog_manager.constants import PLUGIN_NAME
 from astrbot_plugin_blog_manager.exceptions import BlogManagerError
