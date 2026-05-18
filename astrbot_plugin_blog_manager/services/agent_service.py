@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any, Mapping
 
-from ..constants import DEFAULT_AGENT_SYSTEM_PROMPT
+from ..constants import DEFAULT_AGENT_SYSTEM_PROMPT, FIREFLY_FRONTMATTER_TEMPLATE_TEXT
 from ..models import AstroArticleDraft, BlogGenerateRequest, ImageAsset
 from ..utils.slug import slugify
 
@@ -78,11 +78,16 @@ class AgentService:
         prompt = (
             f"{system_prompt}\n\n"
             "请只输出 JSON，不要输出额外解释。JSON 字段必须包含："
-            "`title`, `slug`, `description`, `category`, `tags`, `body`, `images`。\n"
+            "`title`, `slug`, `description`, `category`, `tags`, `image`, `body`, `images`。\n"
             "`slug` 必须是英文或 ASCII 的 kebab-case 路径片段，例如 `welcome-to-my-blog`，"
             "不要输出中文、空格或下划线。\n"
+            "最终发布会使用 Firefly 博客 frontmatter 模板，请围绕下面这套字段组织内容：\n"
+            f"{FIREFLY_FRONTMATTER_TEMPLATE_TEXT}\n"
+            "`title`、`description`、`category`、`image` 这类字符串内容按可被 YAML 双引号包裹的方式生成，避免换行和未转义引号。\n"
+            "`published` 由系统自动写入，不需要你生成。\n"
             "`category` 必须填写一个明确的中文分类，不要留空。\n"
             "`tags` 必须填写 3 到 6 个与主题强相关的中文标签，不要留空，不要只写泛泛词。\n"
+            "`image` 必须返回字符串；没有封面图时返回空字符串。\n"
             "`images` 为数组，每个元素包含 `url` 和 `alt`。\n\n"
             f"主题: {request.topic}\n"
             f"补充要求: {request.instructions or '无'}\n"
@@ -138,6 +143,7 @@ class AgentService:
         slug = str(payload.get("slug", "")).strip() or fixed_slug
         description = str(payload.get("description", "")).strip() or f"{request.topic} 相关文章"
         category = str(payload.get("category", "")).strip() or "技术"
+        image = str(payload.get("image", "")).strip()
         body = str(payload.get("body", "")).strip() or self._fallback_body(request)
         normalized_tags = [str(tag).strip() for tag in tags if str(tag).strip()]
         if not normalized_tags:
@@ -147,7 +153,7 @@ class AgentService:
             description=description,
             body=body,
             slug=slugify(slug or title),
-            frontmatter={"category": category},
+            frontmatter={"category": category, "image": image},
             tags=normalized_tags,
             images=images,
         )
@@ -159,7 +165,7 @@ class AgentService:
             description=f"{title} 的整理与分析",
             body=self._fallback_body(request),
             slug=slugify(title),
-            frontmatter={"category": "技术"},
+            frontmatter={"category": "技术", "image": ""},
             tags=["AstrBot", "Astro", "博客"],
         )
 

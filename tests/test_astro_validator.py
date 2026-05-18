@@ -25,7 +25,18 @@ def test_validator_accepts_valid_draft():
             "category": "技术",
             "tags": ["Astro", "博客"],
         },
-        rendered_content="---\ntitle: 有效文章\n---\n\n# Hello\n",
+        rendered_content=(
+            "---\n"
+            "title: 有效文章\n"
+            "description: 描述\n"
+            "published: 2026-01-01\n"
+            "category: 技术\n"
+            "tags:\n"
+            "- Astro\n"
+            "- 博客\n"
+            "---\n\n"
+            "# Hello\n"
+        ),
     )
 
     result = validator.validate(draft)
@@ -60,3 +71,33 @@ def test_validator_rejects_missing_fields_and_wrong_image_mode():
     assert any(issue.field == "category" for issue in result.issues)
     assert any(issue.field == "tags" for issue in result.issues)
     assert any(issue.field == "image" for issue in result.issues)
+
+
+def test_validator_rejects_rendered_frontmatter_missing_required_fields():
+    validator = AstroValidator(
+        {
+            "content_dir": "src/content/posts",
+            "required_frontmatter_fields": ["title", "published"],
+            "image_mode": "external",
+        }
+    )
+    draft = AstroArticleDraft(
+        title="有效文章",
+        description="描述",
+        body="# Hello",
+        slug="valid-post",
+        article_path="src/content/posts/2026-01-01-valid-post.md",
+        frontmatter={
+            "title": "有效文章",
+            "description": "描述",
+            "published": date(2026, 1, 1),
+            "category": "技术",
+            "tags": ["Astro", "博客"],
+        },
+        rendered_content="---\ntitle: 有效文章\n---\n\n# Hello\n",
+    )
+
+    result = validator.validate(draft)
+
+    assert result.valid is False
+    assert any(issue.field == "rendered_published" for issue in result.issues)

@@ -10,6 +10,7 @@ def test_agent_service_uses_payload_slug_when_available():
         "slug": "welcome-to-my-blog",
         "description": "desc",
         "category": "博客建设",
+        "image": "https://example.com/cover.jpg",
         "body": "# body",
         "tags": ["示例", "博客", "欢迎"],
         "images": [],
@@ -19,4 +20,5 @@ def test_agent_service_uses_payload_slug_when_available():
 
     assert draft.slug == "welcome-to-my-blog"
     assert draft.frontmatter["category"] == "博客建设"
+    assert draft.frontmatter["image"] == "https://example.com/cover.jpg"
     assert draft.tags == ["示例", "博客", "欢迎"]

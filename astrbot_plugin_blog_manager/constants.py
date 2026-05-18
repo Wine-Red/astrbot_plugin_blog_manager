@@ -20,12 +20,24 @@ DEFAULT_FRONTMATTER_TEMPLATE = {
     "comment": True,
     "pinned": False,
     "category": "技术",
+    "image": "",
 }
 DEFAULT_AGENT_SYSTEM_PROMPT = (
     "你是一个 Astro 博客写作助手。你必须生成结构完整、内容丰富、适合直接发布到 Astro "
     "博客仓库的文章。输出内容要准确、自然、避免空泛，frontmatter 必须与正文一致，"
     "并主动补全合适的分类、标签、摘要和可发布的文章结构。"
 )
+FIREFLY_FRONTMATTER_TEMPLATE_TEXT = """---
+title: "你的文章标题"
+published: 2026-05-18
+description: "这是一段关于文章内容的简短描述，会在首页卡片显示"
+image: ""
+tags: ["AI", "周报", "科技"]
+category: "技术分享"
+draft: false
+comment: true
+pinned: false
+---"""
 SUPPORTED_ARTICLE_FORMATS = {"md", "mdx"}
 SUPPORTED_WRITE_MODES = {"direct", "pr"}
 SUPPORTED_IMAGE_MODES = {"external", "download"}

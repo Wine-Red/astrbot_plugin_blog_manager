@@ -10,7 +10,7 @@ import yaml
 
 from ..constants import DEFAULT_CONTENT_DIR
 from ..models import AstroArticleDraft, ValidationIssue, ValidationResult
-from ..utils.markdown import extract_image_urls
+from ..utils.markdown import extract_image_urls, parse_frontmatter
 
 
 class AstroValidator:
@@ -69,6 +69,20 @@ class AstroValidator:
             yaml.safe_dump(draft.frontmatter, allow_unicode=True, sort_keys=False)
         except yaml.YAMLError as exc:
             issues.append(ValidationIssue("frontmatter", f"frontmatter YAML 序列化失败: {exc}"))
+
+        rendered_frontmatter = parse_frontmatter(draft.rendered_content)
+        if draft.rendered_content and not rendered_frontmatter:
+            issues.append(ValidationIssue("rendered_frontmatter", "最终渲染的 Markdown 缺少可解析的 frontmatter。"))
+        elif rendered_frontmatter:
+            for field_name in required_fields:
+                value = rendered_frontmatter.get(field_name)
+                if value in ("", None, []):
+                    issues.append(
+                        ValidationIssue(
+                            f"rendered_{field_name}",
+                            "最终渲染的 frontmatter 缺少必填字段或字段为空。",
+                        )
+                    )
 
         image_mode = str(self.config.get("image_mode", "external"))
         for url in extract_image_urls(draft.rendered_content or draft.body):

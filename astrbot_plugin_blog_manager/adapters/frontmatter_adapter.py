@@ -17,7 +17,23 @@ from ..utils.datetime_utils import frontmatter_date
 def _normalize_required_fields(config: Mapping[str, Any]) -> list[str]:
     raw = config.get("required_frontmatter_fields", [])
     if isinstance(raw, list):
-        return [str(item) for item in raw if str(item).strip()]
+        normalized: list[str] = []
+        for item in raw:
+            field_name = str(item).strip()
+            if not field_name:
+                continue
+            if field_name == "pubDate":
+                field_name = "published"
+            if field_name not in normalized:
+                normalized.append(field_name)
+        return normalized
+    return []
+
+
+def _raw_required_fields(config: Mapping[str, Any]) -> list[str]:
+    raw = config.get("required_frontmatter_fields", [])
+    if isinstance(raw, list):
+        return [str(item).strip() for item in raw if str(item).strip()]
     return []
 
 
@@ -58,6 +74,13 @@ def _normalize_frontmatter_date(value: Any) -> date | None:
     return None
 
 
+def _yaml_safe_inline_text(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    return " ".join(text.split())
+
+
 def build_frontmatter(
     config: Mapping[str, Any],
     request: BlogGenerateRequest,
@@ -68,15 +91,17 @@ def build_frontmatter(
     template = _parse_template_config(config.get("default_frontmatter_template"))
     generated_frontmatter = deepcopy(draft.frontmatter) if isinstance(draft.frontmatter, dict) else {}
     template.update(generated_frontmatter)
+    raw_required_fields = _raw_required_fields(config)
 
     published = _normalize_frontmatter_date(generated_frontmatter.get("published"))
     is_update = published is not None
     if published is None:
         published = frontmatter_date()
 
-    category = str(generated_frontmatter.get("category", "")).strip() or str(
+    category = _yaml_safe_inline_text(generated_frontmatter.get("category", "")) or _yaml_safe_inline_text(
         template.get("category", "技术")
-    ).strip() or "技术"
+    ) or "技术"
+    image = _yaml_safe_inline_text(generated_frontmatter.get("image", template.get("image", "")))
     tags = draft.tags or generated_frontmatter.get("tags") or ["AstrBot", "博客", "Astro"]
     normalized_tags = [str(tag).strip() for tag in tags if str(tag).strip()]
     if not normalized_tags:
@@ -84,17 +109,22 @@ def build_frontmatter(
 
     template.update(
         {
-            "title": draft.title,
-            "description": draft.description,
+            "title": _yaml_safe_inline_text(draft.title),
+            "description": _yaml_safe_inline_text(draft.description),
             "published": published,
             "tags": normalized_tags,
             "category": category,
+            "image": image,
         }
     )
     template.setdefault("author", "AstrBot")
     template.setdefault("draft", False)
     template.setdefault("comment", True)
     template.setdefault("pinned", False)
+    if "pubDate" in raw_required_fields or "pubDate" in template:
+        template["pubDate"] = published.isoformat()
+    if "slug" in raw_required_fields or "slug" in template:
+        template["slug"] = draft.slug
     if is_update:
         template["updated"] = frontmatter_date()
 
