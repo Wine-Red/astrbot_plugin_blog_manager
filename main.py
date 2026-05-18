@@ -100,7 +100,7 @@ class BlogManagerPlugin(Star):
         topic: str,
         instructions: str = "",
         image_preference: str = "auto",
-    ) -> MessageEventResult:
+    ) -> str:
         """生成 Astro 博客文章草稿。
 
         Args:
@@ -116,9 +116,9 @@ class BlogManagerPlugin(Star):
         )
         try:
             draft = await self.blog_service.generate_draft(request, event=event)
-            yield event.plain_result(format_draft_summary(draft))
+            return format_draft_summary(draft)
         except BlogManagerError as exc:
-            yield event.plain_result(f"草稿生成失败: {exc}")
+            return f"草稿生成失败: {exc}"
 
     @filter.llm_tool(name="publish_blog_article")
     async def publish_blog_article(
@@ -128,7 +128,7 @@ class BlogManagerPlugin(Star):
         instructions: str = "",
         image_preference: str = "auto",
         immediate_publish: bool = True,
-    ) -> MessageEventResult:
+    ) -> str:
         """生成并发布 Astro 博客文章。
 
         Args:
@@ -139,8 +139,7 @@ class BlogManagerPlugin(Star):
         """
 
         if not self.config.get("allow_auto_publish", True):
-            yield event.plain_result("当前配置未允许通过自然语言工具直接发布。")
-            return
+            return "当前配置未允许通过自然语言工具直接发布。"
 
         request = BlogGenerateRequest(
             topic=extract_tool_string(topic),
@@ -150,9 +149,9 @@ class BlogManagerPlugin(Star):
         )
         try:
             result = await self.blog_service.publish(request, event=event)
-            yield event.plain_result(format_publish_summary(result))
+            return format_publish_summary(result)
         except BlogManagerError as exc:
-            yield event.plain_result(f"发布失败: {exc}")
+            return f"发布失败: {exc}"
 
     async def terminate(self):
         """Cleanup hook."""
