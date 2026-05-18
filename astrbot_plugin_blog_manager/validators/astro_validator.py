@@ -1,0 +1,76 @@
+"""Astro content pre-validator."""
+
+from __future__ import annotations
+
+from pathlib import PurePosixPath
+from typing import Any, Mapping
+
+import yaml
+
+from ..constants import DEFAULT_CONTENT_DIR
+from ..models import AstroArticleDraft, ValidationIssue, ValidationResult
+from ..utils.markdown import extract_image_urls
+
+
+class AstroValidator:
+    """Performs strict plugin-side validation before publishing to GitHub."""
+
+    def __init__(self, config: Mapping[str, Any]):
+        self.config = config
+
+    def validate(self, draft: AstroArticleDraft) -> ValidationResult:
+        issues: list[ValidationIssue] = []
+        required_fields = self.config.get("required_frontmatter_fields", [])
+        if not isinstance(required_fields, list):
+            required_fields = []
+
+        if not draft.title.strip():
+            issues.append(ValidationIssue("title", "标题不能为空。"))
+        if not draft.description.strip():
+            issues.append(ValidationIssue("description", "描述不能为空。"))
+        if not draft.body.strip():
+            issues.append(ValidationIssue("body", "正文不能为空。"))
+        if not draft.article_path.strip():
+            issues.append(ValidationIssue("article_path", "文章路径不能为空。"))
+        else:
+            content_dir = str(self.config.get("content_dir", DEFAULT_CONTENT_DIR)).strip("/")
+            article_path = PurePosixPath(draft.article_path)
+            expected_root = PurePosixPath(content_dir)
+            if expected_root not in article_path.parents:
+                issues.append(
+                    ValidationIssue("article_path", "文章路径必须位于配置的 content_dir 下。")
+                )
+
+        for field_name in required_fields:
+            value = draft.frontmatter.get(field_name)
+            if value in ("", None, []):
+                issues.append(
+                    ValidationIssue(str(field_name), "frontmatter 缺少必填字段或字段为空。")
+                )
+
+        pub_date = draft.frontmatter.get("pubDate")
+        if pub_date is not None and not isinstance(pub_date, str):
+            issues.append(ValidationIssue("pubDate", "pubDate 必须是字符串。"))
+        slug = draft.frontmatter.get("slug")
+        if slug is not None and not isinstance(slug, str):
+            issues.append(ValidationIssue("slug", "slug 必须是字符串。"))
+
+        try:
+            yaml.safe_dump(draft.frontmatter, allow_unicode=True, sort_keys=False)
+        except yaml.YAMLError as exc:
+            issues.append(ValidationIssue("frontmatter", f"frontmatter YAML 序列化失败: {exc}"))
+
+        image_mode = str(self.config.get("image_mode", "external"))
+        for url in extract_image_urls(draft.rendered_content or draft.body):
+            if image_mode == "download" and url.startswith("http"):
+                issues.append(
+                    ValidationIssue("image", "download 模式下不应保留外链图片引用。")
+                )
+            if image_mode == "external" and not (
+                url.startswith("http") or url.startswith("/")
+            ):
+                issues.append(
+                    ValidationIssue("image", "external 模式下图片应使用站点路径或外链 URL。")
+                )
+
+        return ValidationResult(valid=not issues, issues=issues)

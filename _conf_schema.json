@@ -1,0 +1,103 @@
+{
+  "github_token": {
+    "description": "GitHub Personal Access Token",
+    "type": "string",
+    "default": "",
+    "hint": "需要至少具备目标博客仓库的内容写入权限。",
+    "obvious_hint": true,
+    "invisible": true
+  },
+  "github_owner": {
+    "description": "目标博客仓库 owner",
+    "type": "string",
+    "default": ""
+  },
+  "github_repo": {
+    "description": "目标博客仓库名",
+    "type": "string",
+    "default": ""
+  },
+  "default_branch": {
+    "description": "目标仓库默认分支",
+    "type": "string",
+    "default": "main"
+  },
+  "write_mode": {
+    "description": "默认写入模式",
+    "type": "string",
+    "default": "pr",
+    "options": ["pr", "direct"]
+  },
+  "pr_branch_prefix": {
+    "description": "PR 工作分支前缀",
+    "type": "string",
+    "default": "astrbot/blog"
+  },
+  "content_dir": {
+    "description": "Astro 内容目录",
+    "type": "string",
+    "default": "src/content/blog"
+  },
+  "asset_dir": {
+    "description": "图片资源目录",
+    "type": "string",
+    "default": "src/assets/blog"
+  },
+  "article_format": {
+    "description": "文章文件格式",
+    "type": "string",
+    "default": "md",
+    "options": ["md", "mdx"]
+  },
+  "image_mode": {
+    "description": "图片处理模式",
+    "type": "string",
+    "default": "external",
+    "options": ["external", "download"]
+  },
+  "site_base_url": {
+    "description": "站点前缀 URL",
+    "type": "string",
+    "default": "/",
+    "hint": "用于拼接文章链接，例如 https://example.com/blog。"
+  },
+  "frontmatter_schema_mode": {
+    "description": "frontmatter 校验模式",
+    "type": "string",
+    "default": "astro_common",
+    "options": ["astro_common", "custom"]
+  },
+  "required_frontmatter_fields": {
+    "description": "frontmatter 必填字段",
+    "type": "list",
+    "default": ["title", "description", "pubDate", "slug"]
+  },
+  "default_frontmatter_template": {
+    "description": "默认 frontmatter 模板",
+    "type": "dict",
+    "items": {},
+    "default": {
+      "draft": false
+    }
+  },
+  "allow_auto_publish": {
+    "description": "是否允许自然语言直接发布",
+    "type": "bool",
+    "default": true
+  },
+  "agent_system_prompt": {
+    "description": "Agent 系统提示词",
+    "type": "text",
+    "default": "你是一个 Astro 博客写作助手。你必须生成结构完整、内容丰富、适合直接发布到 Astro 博客仓库的文章。输出内容要准确、自然、避免空泛，frontmatter 必须与正文一致。"
+  },
+  "search_enabled": {
+    "description": "是否启用搜索增强预留接口",
+    "type": "bool",
+    "default": false
+  },
+  "schedule_feature_enabled": {
+    "description": "是否启用定时任务预留接口",
+    "type": "bool",
+    "default": false
+  }
+}
