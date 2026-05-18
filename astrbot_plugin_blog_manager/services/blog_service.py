@@ -16,7 +16,8 @@ from ..models import (
     PublishResult,
     PullRequestMergeResult,
 )
-from ..utils.markdown import render_markdown_document
+from ..utils.datetime_utils import frontmatter_date
+from ..utils.markdown import parse_frontmatter, render_markdown_document
 from ..validators.astro_validator import AstroValidator
 from .agent_service import AgentService
 from .publish_service import PublishService
@@ -128,6 +129,9 @@ class BlogService:
         )
         draft.slug = article.slug
         draft.article_path = article.path
+        existing_frontmatter = parse_frontmatter(existing_content)
+        if existing_frontmatter:
+            draft.frontmatter = existing_frontmatter
         draft.frontmatter = build_frontmatter(self.config, request, draft)
         draft.rendered_content = render_markdown_document(draft.frontmatter, draft.body)
         self._ensure_valid(draft)
@@ -154,8 +158,9 @@ class BlogService:
             frontmatter={
                 "title": "Manual Check",
                 "description": "Manual Check",
-                "pubDate": "2026-01-01T00:00:00+00:00",
-                "slug": slug,
+                "published": frontmatter_date(),
+                "category": "技术",
+                "tags": ["检查", "草稿"],
             },
             rendered_content=content,
         )

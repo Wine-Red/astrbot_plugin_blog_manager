@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 
 def utc_now() -> datetime:
@@ -15,6 +15,12 @@ def iso_pub_date() -> str:
     """Return an ISO timestamp compatible with Astro frontmatter."""
 
     return utc_now().isoformat()
+
+
+def frontmatter_date() -> date:
+    """Return a YAML-friendly date object for Astro content collections."""
+
+    return utc_now().date()
 
 
 def date_path_fragment() -> str:

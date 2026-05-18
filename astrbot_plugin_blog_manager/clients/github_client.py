@@ -76,6 +76,11 @@ class GitHubClient:
                     f"无法合并 PR #{kwargs_pr_hint(operation)}。"
                     "请检查 PR 是否存在、是否已关闭，或当前 Token 是否有合并权限。"
                 )
+            elif operation.startswith("delete_branch:"):
+                message = (
+                    f"找不到分支 `{kwargs_branch_hint(operation, prefix='delete_branch:')}`。"
+                    "它可能已被删除，或该分支不在当前仓库中。"
+                )
             else:
                 message = f"GitHub 资源不存在或当前 Token 无权访问：{github_message or response.text}"
         elif response.status_code in (401, 403):
@@ -84,6 +89,11 @@ class GitHubClient:
                     f"合并 PR 权限不足（{response.status_code}）。"
                     "请确认 github_token 具有 Pull requests 写权限，"
                     "并且当前账号对目标仓库拥有合并权限。"
+                )
+            elif operation.startswith("delete_branch:"):
+                message = (
+                    f"删除分支权限不足（{response.status_code}）。"
+                    "请确认 github_token 具有仓库 contents 写权限，且当前账号允许删除分支。"
                 )
             else:
                 message = (
@@ -117,6 +127,13 @@ class GitHubClient:
             f"{self.repo_api}/git/refs",
             json=payload,
             operation="create_branch",
+        )
+
+    async def delete_branch(self, branch: str) -> None:
+        await self._request(
+            "DELETE",
+            f"{self.repo_api}/git/refs/heads/{branch}",
+            operation=f"delete_branch:{branch}",
         )
 
     async def get_file_sha(self, path: str, branch: str) -> str:
@@ -234,6 +251,7 @@ class GitHubClient:
         method: str = "squash",
         commit_title: str = "",
     ) -> PullRequestMergeResult:
+        pr_info = await self.get_pull_request(number)
         payload: dict[str, Any] = {"merge_method": method}
         if commit_title:
             payload["commit_title"] = commit_title
@@ -243,7 +261,18 @@ class GitHubClient:
             json=payload,
             operation=f"merge_pull_request:{number}",
         )
-        pr_info = await self.get_pull_request(number)
+        deleted_branch = ""
+        warnings: list[str] = []
+        if (
+            bool(data.get("merged", False))
+            and pr_info.head
+            and pr_info.head != pr_info.base
+        ):
+            try:
+                await self.delete_branch(pr_info.head)
+                deleted_branch = pr_info.head
+            except GitHubClientError as exc:
+                warnings.append(f"自动删除分支失败：{exc}")
         return PullRequestMergeResult(
             number=number,
             title=pr_info.title,
@@ -251,6 +280,8 @@ class GitHubClient:
             sha=str(data.get("sha", "")),
             method=method,
             url=pr_info.url,
+            deleted_branch=deleted_branch,
+            warnings=warnings,
         )
 
     async def verify_repository_access(self, default_branch: str) -> None:
@@ -271,8 +302,7 @@ class GitHubClient:
         )
 
 
-def kwargs_branch_hint(operation: str) -> str:
-    prefix = "get_branch_sha:"
+def kwargs_branch_hint(operation: str, prefix: str = "get_branch_sha:") -> str:
     if operation.startswith(prefix):
         return operation[len(prefix) :]
     return "unknown"

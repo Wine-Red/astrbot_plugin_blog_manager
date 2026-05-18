@@ -35,7 +35,7 @@
   "content_dir": {
     "description": "Astro 内容目录",
     "type": "string",
-    "default": "src/content/blog"
+    "default": "src/content/posts"
   },
   "asset_dir": {
     "description": "图片资源目录",
@@ -69,13 +69,13 @@
   "required_frontmatter_fields": {
     "description": "frontmatter 必填字段",
     "type": "list",
-    "default": ["title", "description", "pubDate", "slug"]
+    "default": ["title", "published"]
   },
   "default_frontmatter_template": {
     "description": "默认 frontmatter 模板",
     "type": "text",
-    "default": "{\n  \"draft\": false\n}",
-    "hint": "请填写 JSON 或 YAML 对象，例如 {\"draft\": false}。",
+    "default": "{\n  \"draft\": false,\n  \"comment\": true,\n  \"pinned\": false,\n  \"category\": \"技术\"\n}",
+    "hint": "请填写 JSON 或 YAML 对象，例如 {\"draft\": false, \"comment\": true, \"pinned\": false, \"category\": \"技术\"}。",
     "editor_mode": true,
     "editor_language": "json"
   },
@@ -87,7 +87,7 @@
   "agent_system_prompt": {
     "description": "Agent 系统提示词",
     "type": "text",
-    "default": "你是一个 Astro 博客写作助手。你必须生成结构完整、内容丰富、适合直接发布到 Astro 博客仓库的文章。输出内容要准确、自然、避免空泛，frontmatter 必须与正文一致。"
+    "default": "你是一个 Astro 博客写作助手。你必须生成结构完整、内容丰富、适合直接发布到 Astro 博客仓库的文章。输出内容要准确、自然、避免空泛，frontmatter 必须与正文一致，并主动补全合适的分类、标签、摘要和可发布的文章结构。"
   },
   "search_enabled": {
     "description": "是否启用搜索增强预留接口",

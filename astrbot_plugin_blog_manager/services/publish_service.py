@@ -39,7 +39,8 @@ class PublishService:
             str(self.config.get("default_branch", "main")).strip() or "main"
         )
         repository_service = RepositoryService(client, self.config)
-        draft.frontmatter = build_frontmatter(self.config, request, draft)
+        if not draft.frontmatter:
+            draft.frontmatter = build_frontmatter(self.config, request, draft)
         draft.rendered_content = render_markdown_document(draft.frontmatter, draft.body)
         draft.article_path = self.adapter.build_article_path(draft)
         draft, media_changes, warnings = await self.media_service.prepare_assets(draft)
@@ -114,7 +115,8 @@ class PublishService:
             str(self.config.get("default_branch", "main")).strip() or "main"
         )
         repository_service = RepositoryService(client, self.config)
-        draft.frontmatter = build_frontmatter(self.config, request, draft)
+        if not draft.frontmatter:
+            draft.frontmatter = build_frontmatter(self.config, request, draft)
         draft.rendered_content = render_markdown_document(draft.frontmatter, draft.body)
         draft.article_path = article_path
         draft, media_changes, warnings = await self.media_service.prepare_assets(draft)

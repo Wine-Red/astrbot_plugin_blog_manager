@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import json
 from copy import deepcopy
+from datetime import date, datetime
 from typing import Any, Mapping
 
 import yaml
 
 from ..constants import DEFAULT_FRONTMATTER_TEMPLATE
 from ..models import AstroArticleDraft, BlogGenerateRequest
-from ..utils.datetime_utils import iso_pub_date
+from ..utils.datetime_utils import frontmatter_date
 
 
 def _normalize_required_fields(config: Mapping[str, Any]) -> list[str]:
@@ -40,6 +41,23 @@ def _parse_template_config(raw: Any) -> dict[str, Any]:
     return deepcopy(DEFAULT_FRONTMATTER_TEMPLATE)
 
 
+def _normalize_frontmatter_date(value: Any) -> date | None:
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str) and value.strip():
+        text = value.strip()
+        try:
+            return datetime.fromisoformat(text.replace("Z", "+00:00")).date()
+        except ValueError:
+            try:
+                return date.fromisoformat(text[:10])
+            except ValueError:
+                return None
+    return None
+
+
 def build_frontmatter(
     config: Mapping[str, Any],
     request: BlogGenerateRequest,
@@ -48,23 +66,42 @@ def build_frontmatter(
     """Merge template defaults and generated article metadata."""
 
     template = _parse_template_config(config.get("default_frontmatter_template"))
+    generated_frontmatter = deepcopy(draft.frontmatter) if isinstance(draft.frontmatter, dict) else {}
+    template.update(generated_frontmatter)
+
+    published = _normalize_frontmatter_date(generated_frontmatter.get("published"))
+    is_update = published is not None
+    if published is None:
+        published = frontmatter_date()
+
+    category = str(generated_frontmatter.get("category", "")).strip() or str(
+        template.get("category", "技术")
+    ).strip() or "技术"
+    tags = draft.tags or generated_frontmatter.get("tags") or ["AstrBot", "博客", "Astro"]
+    normalized_tags = [str(tag).strip() for tag in tags if str(tag).strip()]
+    if not normalized_tags:
+        normalized_tags = ["AstrBot", "博客", "Astro"]
 
     template.update(
         {
             "title": draft.title,
             "description": draft.description,
-            "pubDate": draft.frontmatter.get("pubDate", iso_pub_date()),
-            "slug": draft.slug,
-            "tags": draft.tags,
+            "published": published,
+            "tags": normalized_tags,
+            "category": category,
         }
     )
     template.setdefault("author", "AstrBot")
     template.setdefault("draft", False)
-    template.setdefault("topic", request.topic)
-    if request.audience:
-        template.setdefault("audience", request.audience)
+    template.setdefault("comment", True)
+    template.setdefault("pinned", False)
+    if is_update:
+        template["updated"] = frontmatter_date()
 
     required = _normalize_required_fields(config)
     for field_name in required:
-        template.setdefault(field_name, draft.frontmatter.get(field_name, ""))
+        fallback = generated_frontmatter.get(field_name, "")
+        if field_name == "published" and not fallback:
+            fallback = published
+        template.setdefault(field_name, fallback)
     return template

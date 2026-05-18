@@ -9,11 +9,14 @@ def test_agent_service_uses_payload_slug_when_available():
         "title": "示例文章：欢迎来到我的博客",
         "slug": "welcome-to-my-blog",
         "description": "desc",
+        "category": "博客建设",
         "body": "# body",
-        "tags": ["demo"],
+        "tags": ["示例", "博客", "欢迎"],
         "images": [],
     }
 
     draft = service._draft_from_payload(request, payload)
 
     assert draft.slug == "welcome-to-my-blog"
+    assert draft.frontmatter["category"] == "博客建设"
+    assert draft.tags == ["示例", "博客", "欢迎"]

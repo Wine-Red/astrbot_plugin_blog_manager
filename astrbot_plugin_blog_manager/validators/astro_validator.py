@@ -1,6 +1,7 @@
 """Astro content pre-validator."""
 
 from __future__ import annotations
+from datetime import date
 
 from pathlib import PurePosixPath
 from typing import Any, Mapping
@@ -30,6 +31,12 @@ class AstroValidator:
             issues.append(ValidationIssue("description", "描述不能为空。"))
         if not draft.body.strip():
             issues.append(ValidationIssue("body", "正文不能为空。"))
+        tags = draft.frontmatter.get("tags", [])
+        if not isinstance(tags, list) or not [tag for tag in tags if str(tag).strip()]:
+            issues.append(ValidationIssue("tags", "至少需要一个标签。"))
+        category = draft.frontmatter.get("category", "")
+        if not str(category).strip():
+            issues.append(ValidationIssue("category", "分类不能为空。"))
         if not draft.article_path.strip():
             issues.append(ValidationIssue("article_path", "文章路径不能为空。"))
         else:
@@ -48,9 +55,12 @@ class AstroValidator:
                     ValidationIssue(str(field_name), "frontmatter 缺少必填字段或字段为空。")
                 )
 
-        pub_date = draft.frontmatter.get("pubDate")
-        if pub_date is not None and not isinstance(pub_date, str):
-            issues.append(ValidationIssue("pubDate", "pubDate 必须是字符串。"))
+        published = draft.frontmatter.get("published")
+        if published is not None and not isinstance(published, date):
+            issues.append(ValidationIssue("published", "published 必须是日期。"))
+        updated = draft.frontmatter.get("updated")
+        if updated is not None and not isinstance(updated, date):
+            issues.append(ValidationIssue("updated", "updated 必须是日期。"))
         slug = draft.frontmatter.get("slug")
         if slug is not None and not isinstance(slug, str):
             issues.append(ValidationIssue("slug", "slug 必须是字符串。"))

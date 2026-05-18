@@ -134,6 +134,8 @@ class PullRequestMergeResult:
     sha: str
     method: str
     url: str = ""
+    deleted_branch: str = ""
+    warnings: list[str] = field(default_factory=list)
 
     def to_lines(self) -> list[str]:
         lines = [
@@ -144,8 +146,12 @@ class PullRequestMergeResult:
         ]
         if self.sha:
             lines.append(f"Merge Commit: {self.sha}")
+        if self.deleted_branch:
+            lines.append(f"已删除分支: {self.deleted_branch}")
         if self.url:
             lines.append(f"PR: {self.url}")
+        if self.warnings:
+            lines.append("警告: " + "；".join(self.warnings))
         return lines
 
 

@@ -78,9 +78,11 @@ class AgentService:
         prompt = (
             f"{system_prompt}\n\n"
             "请只输出 JSON，不要输出额外解释。JSON 字段必须包含："
-            "`title`, `slug`, `description`, `body`, `tags`, `images`。\n"
+            "`title`, `slug`, `description`, `category`, `tags`, `body`, `images`。\n"
             "`slug` 必须是英文或 ASCII 的 kebab-case 路径片段，例如 `welcome-to-my-blog`，"
             "不要输出中文、空格或下划线。\n"
+            "`category` 必须填写一个明确的中文分类，不要留空。\n"
+            "`tags` 必须填写 3 到 6 个与主题强相关的中文标签，不要留空，不要只写泛泛词。\n"
             "`images` 为数组，每个元素包含 `url` 和 `alt`。\n\n"
             f"主题: {request.topic}\n"
             f"补充要求: {request.instructions or '无'}\n"
@@ -135,13 +137,18 @@ class AgentService:
         title = str(payload.get("title", "")).strip() or request.topic
         slug = str(payload.get("slug", "")).strip() or fixed_slug
         description = str(payload.get("description", "")).strip() or f"{request.topic} 相关文章"
+        category = str(payload.get("category", "")).strip() or "技术"
         body = str(payload.get("body", "")).strip() or self._fallback_body(request)
+        normalized_tags = [str(tag).strip() for tag in tags if str(tag).strip()]
+        if not normalized_tags:
+            normalized_tags = ["AstrBot", "博客", "Astro"]
         return AstroArticleDraft(
             title=title,
             description=description,
             body=body,
             slug=slugify(slug or title),
-            tags=[str(tag) for tag in tags if str(tag).strip()],
+            frontmatter={"category": category},
+            tags=normalized_tags,
             images=images,
         )
 
@@ -152,7 +159,8 @@ class AgentService:
             description=f"{title} 的整理与分析",
             body=self._fallback_body(request),
             slug=slugify(title),
-            tags=["astrbot", "astro", "blog"],
+            frontmatter={"category": "技术"},
+            tags=["AstrBot", "Astro", "博客"],
         )
 
     def _fallback_body(self, request: BlogGenerateRequest) -> str:

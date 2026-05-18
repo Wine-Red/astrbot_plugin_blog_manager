@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from typing import Iterable
+from typing import Any, Iterable
 
 import yaml
 
@@ -16,6 +16,23 @@ def render_markdown_document(frontmatter: dict, body: str) -> str:
 
     fm_text = yaml.safe_dump(frontmatter, allow_unicode=True, sort_keys=False).strip()
     return f"{FRONTMATTER_BOUNDARY}\n{fm_text}\n{FRONTMATTER_BOUNDARY}\n\n{body.strip()}\n"
+
+
+def parse_frontmatter(markdown_text: str) -> dict[str, Any]:
+    """Parse YAML frontmatter from a Markdown document."""
+
+    if not markdown_text.startswith(f"{FRONTMATTER_BOUNDARY}\n"):
+        return {}
+    parts = markdown_text.split(FRONTMATTER_BOUNDARY, 2)
+    if len(parts) < 3:
+        return {}
+    try:
+        metadata = yaml.safe_load(parts[1]) or {}
+    except yaml.YAMLError:
+        return {}
+    if isinstance(metadata, dict):
+        return metadata
+    return {}
 
 
 def extract_image_urls(markdown_text: str) -> list[str]:

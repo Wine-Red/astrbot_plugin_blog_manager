@@ -26,12 +26,14 @@ def test_pull_request_merge_result_to_lines():
         sha="deadbeef",
         method="squash",
         url="https://github.com/example/repo/pull/12",
+        deleted_branch="astrbot/blog/demo-20260519120000",
     )
 
     lines = result.to_lines()
 
     assert any("状态: 已合并" == line for line in lines)
     assert any("合并方式: squash" == line for line in lines)
+    assert any("已删除分支: astrbot/blog/demo-20260519120000" == line for line in lines)
 
 
 def test_delete_result_to_lines():
