@@ -88,7 +88,7 @@ Hello Astro
 - 文章目录由 `content_dir` 控制
 - 图片目录由 `asset_dir` 控制
 - frontmatter 必填项由 `required_frontmatter_fields` 控制
-- 默认 frontmatter 模板由 `default_frontmatter_template` 控制
+- 默认 frontmatter 模板由 `default_frontmatter_template` 控制，填写 JSON 或 YAML 文本对象
 
 插件会在发布前执行以下预校验：
 

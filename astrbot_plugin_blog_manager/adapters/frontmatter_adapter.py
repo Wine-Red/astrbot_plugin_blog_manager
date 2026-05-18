@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import json
 from copy import deepcopy
 from typing import Any, Mapping
+
+import yaml
 
 from ..constants import DEFAULT_FRONTMATTER_TEMPLATE
 from ..models import AstroArticleDraft, BlogGenerateRequest
@@ -17,6 +20,26 @@ def _normalize_required_fields(config: Mapping[str, Any]) -> list[str]:
     return []
 
 
+def _parse_template_config(raw: Any) -> dict[str, Any]:
+    if isinstance(raw, dict):
+        return deepcopy(raw)
+    if not isinstance(raw, str) or not raw.strip():
+        return deepcopy(DEFAULT_FRONTMATTER_TEMPLATE)
+
+    text = raw.strip()
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        try:
+            parsed = yaml.safe_load(text)
+        except yaml.YAMLError:
+            return deepcopy(DEFAULT_FRONTMATTER_TEMPLATE)
+
+    if isinstance(parsed, dict):
+        return deepcopy(parsed)
+    return deepcopy(DEFAULT_FRONTMATTER_TEMPLATE)
+
+
 def build_frontmatter(
     config: Mapping[str, Any],
     request: BlogGenerateRequest,
@@ -24,11 +47,7 @@ def build_frontmatter(
 ) -> dict[str, Any]:
     """Merge template defaults and generated article metadata."""
 
-    template = config.get("default_frontmatter_template") or DEFAULT_FRONTMATTER_TEMPLATE
-    if not isinstance(template, dict):
-        template = deepcopy(DEFAULT_FRONTMATTER_TEMPLATE)
-    else:
-        template = deepcopy(template)
+    template = _parse_template_config(config.get("default_frontmatter_template"))
 
     template.update(
         {

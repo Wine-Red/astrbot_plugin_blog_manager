@@ -74,11 +74,11 @@
   },
   "default_frontmatter_template": {
     "description": "默认 frontmatter 模板",
-    "type": "dict",
-    "items": {},
-    "default": {
-      "draft": false
-    }
+    "type": "text",
+    "default": "{\n  \"draft\": false\n}",
+    "hint": "请填写 JSON 或 YAML 对象，例如 {\"draft\": false}。",
+    "editor_mode": true,
+    "editor_language": "json"
   },
   "allow_auto_publish": {
     "description": "是否允许自然语言直接发布",

@@ -24,3 +24,21 @@ def test_build_frontmatter_merges_defaults_and_runtime_fields():
     assert frontmatter["layout"] == "post"
     assert frontmatter["draft"] is False
 
+
+def test_build_frontmatter_accepts_json_text_template():
+    config = {
+        "default_frontmatter_template": '{\n  "draft": false,\n  "layout": "post"\n}',
+        "required_frontmatter_fields": ["title", "description", "pubDate", "slug"],
+    }
+    request = BlogGenerateRequest(topic="Astro 发布")
+    draft = AstroArticleDraft(
+        title="Astro 发布",
+        description="Astro 发布说明",
+        body="# Demo",
+        slug="astro-publish",
+    )
+
+    frontmatter = build_frontmatter(config, request, draft)
+
+    assert frontmatter["layout"] == "post"
+    assert frontmatter["draft"] is False
