@@ -22,10 +22,17 @@ class AgentService:
         request: BlogGenerateRequest,
         *,
         event: Any | None = None,
+        existing_article: str = "",
+        fixed_slug: str = "",
     ) -> AstroArticleDraft:
-        llm_payload = await self._try_llm_generate(request, event=event)
+        llm_payload = await self._try_llm_generate(
+            request,
+            event=event,
+            existing_article=existing_article,
+            fixed_slug=fixed_slug,
+        )
         if llm_payload:
-            return self._draft_from_payload(request, llm_payload)
+            return self._draft_from_payload(request, llm_payload, fixed_slug=fixed_slug)
         return self._fallback_draft(request)
 
     async def _try_llm_generate(
@@ -33,6 +40,8 @@ class AgentService:
         request: BlogGenerateRequest,
         *,
         event: Any | None = None,
+        existing_article: str = "",
+        fixed_slug: str = "",
     ) -> dict[str, Any] | None:
         if not event or not hasattr(self.context, "llm_generate"):
             return None
@@ -40,7 +49,11 @@ class AgentService:
             return None
 
         provider_id = await self.context.get_current_chat_provider_id(event.unified_msg_origin)
-        prompt = self._build_prompt(request)
+        prompt = self._build_prompt(
+            request,
+            existing_article=existing_article,
+            fixed_slug=fixed_slug,
+        )
         try:
             response = await self.context.llm_generate(
                 chat_provider_id=provider_id,
@@ -52,14 +65,22 @@ class AgentService:
         completion_text = getattr(response, "completion_text", "")
         return self._parse_json_payload(completion_text)
 
-    def _build_prompt(self, request: BlogGenerateRequest) -> str:
+    def _build_prompt(
+        self,
+        request: BlogGenerateRequest,
+        *,
+        existing_article: str = "",
+        fixed_slug: str = "",
+    ) -> str:
         system_prompt = str(
             self.config.get("agent_system_prompt", DEFAULT_AGENT_SYSTEM_PROMPT)
         ).strip()
-        return (
+        prompt = (
             f"{system_prompt}\n\n"
             "请只输出 JSON，不要输出额外解释。JSON 字段必须包含："
-            "`title`, `description`, `body`, `tags`, `images`。\n"
+            "`title`, `slug`, `description`, `body`, `tags`, `images`。\n"
+            "`slug` 必须是英文或 ASCII 的 kebab-case 路径片段，例如 `welcome-to-my-blog`，"
+            "不要输出中文、空格或下划线。\n"
             "`images` 为数组，每个元素包含 `url` 和 `alt`。\n\n"
             f"主题: {request.topic}\n"
             f"补充要求: {request.instructions or '无'}\n"
@@ -67,6 +88,11 @@ class AgentService:
             f"文风: {request.tone}\n"
             "正文请使用 Markdown/MDX 兼容写法，结构完整，内容充实。"
         )
+        if fixed_slug:
+            prompt += f"\n必须保留 slug 为：{fixed_slug}"
+        if existing_article:
+            prompt += f"\n\n以下是当前文章内容，请在此基础上更新，而不是从零重写路径：\n{existing_article}"
+        return prompt
 
     def _parse_json_payload(self, text: str) -> dict[str, Any] | None:
         text = text.strip()
@@ -88,6 +114,8 @@ class AgentService:
         self,
         request: BlogGenerateRequest,
         payload: dict[str, Any],
+        *,
+        fixed_slug: str = "",
     ) -> AstroArticleDraft:
         tags = payload.get("tags") or []
         if not isinstance(tags, list):
@@ -105,13 +133,14 @@ class AgentService:
                         )
                     )
         title = str(payload.get("title", "")).strip() or request.topic
+        slug = str(payload.get("slug", "")).strip() or fixed_slug
         description = str(payload.get("description", "")).strip() or f"{request.topic} 相关文章"
         body = str(payload.get("body", "")).strip() or self._fallback_body(request)
         return AstroArticleDraft(
             title=title,
             description=description,
             body=body,
-            slug=slugify(title),
+            slug=slugify(slug or title),
             tags=[str(tag) for tag in tags if str(tag).strip()],
             images=images,
         )

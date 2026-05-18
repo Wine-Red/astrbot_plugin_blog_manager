@@ -4,7 +4,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..models import AstroArticleDraft, BlogGenerateRequest, PublishResult
+from ..models import (
+    ArticleSummary,
+    AstroArticleDraft,
+    BlogGenerateRequest,
+    DeleteResult,
+    PublishResult,
+    PullRequestMergeResult,
+)
 
 
 def parse_blog_command(message_text: str) -> tuple[str, str]:
@@ -58,6 +65,28 @@ def format_publish_summary(result: PublishResult) -> str:
     return "发布完成。\n" + "\n".join(result.to_lines())
 
 
+def format_merge_summary(result: PullRequestMergeResult) -> str:
+    """Return a compact merge summary for QQ replies."""
+
+    return "PR 合并完成。\n" + "\n".join(result.to_lines())
+
+
+def format_delete_summary(result: DeleteResult) -> str:
+    """Return a compact delete summary for QQ replies."""
+
+    return "文章删除完成。\n" + "\n".join(result.to_lines())
+
+
+def format_list_summary(items: list[ArticleSummary]) -> str:
+    """Return a compact article list."""
+
+    if not items:
+        return "未找到文章。"
+    lines = ["文章列表："]
+    lines.extend(item.to_line() for item in items)
+    return "\n".join(lines)
+
+
 def format_help_text() -> str:
     """Help text for the `/blog` command."""
 
@@ -66,6 +95,10 @@ def format_help_text() -> str:
             "用法:",
             "/blog publish <主题或要求>",
             "/blog draft <主题或要求>",
+            "/blog list [数量]",
+            "/blog update <slug或完整路径> <更新要求>",
+            "/blog merge <PR编号> [merge|squash|rebase]",
+            "/blog delete <slug或完整路径>",
             "/blog check <Markdown 草稿>",
             "/blog config-check",
         ]

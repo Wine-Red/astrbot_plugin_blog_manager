@@ -8,7 +8,14 @@ from ..adapters.astro_adapter import AstroAdapter
 from ..adapters.frontmatter_adapter import build_frontmatter
 from ..constants import DEFAULT_REQUIRED_FRONTMATTER_FIELDS
 from ..exceptions import AstroValidationError, PluginConfigError
-from ..models import AstroArticleDraft, BlogGenerateRequest, PublishResult
+from ..models import (
+    ArticleSummary,
+    AstroArticleDraft,
+    BlogGenerateRequest,
+    DeleteResult,
+    PublishResult,
+    PullRequestMergeResult,
+)
 from ..utils.markdown import render_markdown_document
 from ..validators.astro_validator import AstroValidator
 from .agent_service import AgentService
@@ -75,6 +82,60 @@ class BlogService:
         self._ensure_github_ready()
         draft = await self.generate_draft(request, event=event)
         return await self.publish_service.publish(request, draft)
+
+    async def list_articles(self, *, limit: int = 10) -> list[ArticleSummary]:
+        self._ensure_github_ready()
+        return await self.publish_service.list_articles(limit=limit)
+
+    async def merge_pull_request(
+        self,
+        *,
+        pr_number: int,
+        method: str = "squash",
+    ) -> PullRequestMergeResult:
+        self._ensure_github_ready()
+        return await self.publish_service.merge_pull_request(
+            pr_number=pr_number,
+            method=method,
+        )
+
+    async def delete_article(self, *, target: str) -> DeleteResult:
+        self._ensure_github_ready()
+        return await self.publish_service.delete_article(target=target)
+
+    async def update_article(
+        self,
+        *,
+        target: str,
+        instructions: str,
+        event: Any | None = None,
+    ) -> PublishResult:
+        self._ensure_github_ready()
+        article, existing_content = await self.publish_service.get_article(target=target)
+        request = BlogGenerateRequest(
+            topic=article.title,
+            instructions=(
+                f"请基于现有文章进行更新，保留文章主题与路径 slug，不要新建文章。"
+                f"更新要求：{instructions}"
+            ),
+            immediate_publish=True,
+        )
+        draft = await self.agent_service.generate_article(
+            request,
+            event=event,
+            existing_article=existing_content,
+            fixed_slug=article.slug,
+        )
+        draft.slug = article.slug
+        draft.article_path = article.path
+        draft.frontmatter = build_frontmatter(self.config, request, draft)
+        draft.rendered_content = render_markdown_document(draft.frontmatter, draft.body)
+        self._ensure_valid(draft)
+        return await self.publish_service.update_article(
+            request,
+            draft,
+            article_path=article.path,
+        )
 
     def validate_rendered_article(self, content: str, slug: str = "manual-check") -> list[str]:
         draft = AstroArticleDraft(

@@ -86,6 +86,7 @@ class PublishResult:
     article_path: str
     article_title: str
     slug: str
+    pr_number: int = 0
     pr_url: str = ""
     article_url: str = ""
     warnings: list[str] = field(default_factory=list)
@@ -99,6 +100,8 @@ class PublishResult:
             f"分支: {self.branch}",
             f"Commit: {self.commit_sha}",
         ]
+        if self.pr_number:
+            lines.append(f"PR 编号: {self.pr_number}")
         if self.pr_url:
             lines.append(f"PR: {self.pr_url}")
         if self.article_url:
@@ -106,6 +109,83 @@ class PublishResult:
         if self.warnings:
             lines.append("警告: " + "；".join(self.warnings))
         return lines
+
+
+@dataclass(slots=True)
+class PullRequestInfo:
+    """A compact representation of a GitHub pull request."""
+
+    number: int
+    title: str
+    state: str
+    url: str
+    head: str
+    base: str
+    merged: bool = False
+
+
+@dataclass(slots=True)
+class PullRequestMergeResult:
+    """Outcome of merging a GitHub pull request."""
+
+    number: int
+    title: str
+    merged: bool
+    sha: str
+    method: str
+    url: str = ""
+
+    def to_lines(self) -> list[str]:
+        lines = [
+            f"PR 编号: {self.number}",
+            f"标题: {self.title}",
+            f"合并方式: {self.method}",
+            f"状态: {'已合并' if self.merged else '未合并'}",
+        ]
+        if self.sha:
+            lines.append(f"Merge Commit: {self.sha}")
+        if self.url:
+            lines.append(f"PR: {self.url}")
+        return lines
+
+
+@dataclass(slots=True)
+class DeleteResult:
+    """Outcome of deleting an article from GitHub."""
+
+    mode: str
+    target: str
+    deleted_path: str
+    branch: str
+    commit_sha: str
+    pr_number: int = 0
+    pr_url: str = ""
+
+    def to_lines(self) -> list[str]:
+        lines = [
+            f"目标: {self.target}",
+            f"已删除: {self.deleted_path}",
+            f"写入模式: {self.mode}",
+            f"分支: {self.branch}",
+            f"Commit: {self.commit_sha}",
+        ]
+        if self.pr_number:
+            lines.append(f"PR 编号: {self.pr_number}")
+        if self.pr_url:
+            lines.append(f"PR: {self.pr_url}")
+        return lines
+
+
+@dataclass(slots=True)
+class ArticleSummary:
+    """A lightweight article descriptor used for listing repo content."""
+
+    title: str
+    slug: str
+    path: str
+
+    def to_line(self) -> str:
+        return f"- {self.title} | {self.slug} | {self.path}"
 
 
 @dataclass(slots=True)
