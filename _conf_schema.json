@@ -90,9 +90,9 @@
     "default": "你是一个 Astro 博客写作助手。你必须生成结构完整、内容丰富、适合直接发布到 Astro 博客仓库的文章。输出内容要准确、自然、避免空泛，frontmatter 必须与正文一致，并主动补全合适的分类、标签、摘要和可发布的文章结构。"
   },
   "search_enabled": {
-    "description": "是否启用搜索增强预留接口",
+    "description": "是否启用搜索增强与 AI 日报新闻抓取",
     "type": "bool",
-    "default": false
+    "default": true
   },
   "schedule_feature_enabled": {
     "description": "是否启用定时任务预留接口",

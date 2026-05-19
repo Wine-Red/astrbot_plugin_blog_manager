@@ -46,7 +46,10 @@ class BlogManagerPlugin(Star):
         super().__init__(context)
         self.config = config or {}
         self.blog_service = BlogService(context, self.config)
-        self.search_service = SearchService(bool(self.config.get("search_enabled", False)))
+        self.search_service = SearchService(
+            bool(self.config.get("search_enabled", True)),
+            context=context,
+        )
         self.task_service = TaskService(
             bool(self.config.get("schedule_feature_enabled", False))
         )
@@ -58,7 +61,7 @@ class BlogManagerPlugin(Star):
 
     @filter.command("blog")
     async def blog(self, event: AstrMessageEvent):
-        """管理 Astro 博客。支持 publish、draft、list、update、merge、delete、check、config-check。"""
+        """管理 Astro 博客。支持 publish、draft、daily、list、update、merge、delete、check、config-check。"""
 
         subcommand, payload = parse_blog_command(event.message_str)
         try:
@@ -80,6 +83,13 @@ class BlogManagerPlugin(Star):
                 request = build_request_from_payload(topic=payload or "未命名文章")
                 draft = await self.blog_service.generate_draft(request, event=event)
                 yield event.plain_result(format_draft_summary(draft))
+                return
+            if subcommand == "daily":
+                result = await self.blog_service.publish_daily_report(
+                    event=event,
+                    extra_instructions=payload,
+                )
+                yield event.plain_result(format_publish_summary(result))
                 return
             if subcommand == "list":
                 limit = 10
@@ -205,6 +215,30 @@ class BlogManagerPlugin(Star):
             return format_publish_summary(result)
         except BlogManagerError as exc:
             return f"发布失败: {exc}"
+
+    @filter.llm_tool(name="publish_ai_daily_report")
+    async def publish_ai_daily_report(
+        self,
+        event: AstrMessageEvent,
+        instructions: str = "",
+    ) -> str:
+        """搜索今日 AI 新闻，生成并发布 AI 日报。
+
+        Args:
+            instructions(string): 额外日报写作要求
+        """
+
+        if not self.config.get("allow_auto_publish", True):
+            return "当前配置未允许通过自然语言工具直接发布。"
+
+        try:
+            result = await self.blog_service.publish_daily_report(
+                event=event,
+                extra_instructions=extract_tool_string(instructions),
+            )
+            return format_publish_summary(result)
+        except BlogManagerError as exc:
+            return f"AI 日报发布失败: {exc}"
 
     @filter.llm_tool(name="list_blog_articles")
     async def list_blog_articles(

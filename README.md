@@ -6,11 +6,13 @@
 
 - 通过 `/blog draft <主题>` 生成 Astro 兼容文章草稿
 - 通过 `/blog publish <主题>` 生成并发布文章到 GitHub
+- 通过 `/blog daily [额外要求]` 自动搜索 AI 新闻并发布 AI 日报
 - 通过 `/blog check <Markdown>` 做 Astro 预校验
 - 通过 `/blog config-check` 检查关键配置
 - 支持 AstrBot LLM Tool：
   - `draft_blog_article`
   - `publish_blog_article`
+  - `publish_ai_daily_report`
 - 支持两种仓库写入模式：
   - `pr`
   - `direct`
@@ -58,6 +60,7 @@
 ```text
 /blog draft 写一篇关于 Astro Content Collections 的实践文章
 /blog publish 生成一篇 AI 日报风格的 Astro 文章，强调结构化与可读性
+/blog daily 重点关注大模型、Agent 和多模态应用
 /blog check ---
 title: Demo
 description: Demo
@@ -81,6 +84,24 @@ Hello Astro
 
 - `draft_blog_article`
 - `publish_blog_article`
+- `publish_ai_daily_report`
+
+## AI 日报
+
+`/blog daily` 会执行以下流程：
+
+- 使用 AstrBot Context 搜索能力（如存在）或 DuckDuckGo HTML 搜索抓取今日 AI 新闻
+- 默认搜索关键词包括 `AI news today`、`人工智能 最新进展`、`LLM breakthroughs`
+- 汇总至少 3 条新闻源后，生成符合固定结构的 Markdown 日报
+- 优先调用 AstrBot Context 生图能力；若不可用，会生成 Pollinations 封面图 URL
+- 使用 Firefly frontmatter：
+  - `title`: `AI 日报-日期：<日期>：<主标题>`
+  - `description`: `今日 AI 核心速览：<一句话总结>`
+  - `tags`: `["AI", "日报", "人工智能", "<当天核心技术词>"]`
+  - `category`: `AI资讯`
+  - `image`: 封面图 URL
+
+日报 slug 固定为 `ai-daily-YYYY-MM-DD`，保持 ASCII kebab-case，不允许中文 slug。
 
 ## Astro 适配说明
 

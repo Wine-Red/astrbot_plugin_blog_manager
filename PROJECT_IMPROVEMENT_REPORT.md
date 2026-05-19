@@ -4,6 +4,44 @@
 
 ## 本次已完成
 
+### 0. AI 日报自动生成与发布
+
+- 新增 `/blog daily [额外要求]` 指令。
+- 新增自然语言 Tool：`publish_ai_daily_report`。
+- 新增真实搜索服务：
+  - 优先探测 AstrBot Context 中可能存在的 `web_search` / `search_web` / `search` 能力。
+  - 若 Context 不提供搜索能力，则回退到 DuckDuckGo HTML 搜索。
+  - 默认关键词包括 `AI news today`、`人工智能 最新进展`、`LLM breakthroughs`。
+- 日报生成要求至少获取 3 条新闻，否则中止发布。
+- 新增日报专用 Prompt，要求正文包含：
+  - 开篇语
+  - 新闻列表
+  - 核心摘要
+  - 深度解读
+  - Markdown 来源链接
+  - 引用块、分割线和列表
+- 新增封面图流程：
+  - 优先尝试 AstrBot Context 中可能存在的生图接口。
+  - 若不可用，则生成 Pollinations 图片 URL 作为封面。
+- 日报 Firefly frontmatter 固定为：
+  - `title`: `AI 日报-日期：<日期>：<主标题>`
+  - `description`: `今日 AI 核心速览：<一句话总结>`
+  - `tags`: `["AI", "日报", "人工智能", "<当天核心技术词>"]`
+  - `category`: `AI资讯`
+  - `image`: 封面图 URL
+- 日报 slug 固定为 `ai-daily-YYYY-MM-DD`，不会产生中文 slug。
+
+涉及文件：
+
+- `main.py`
+- `astrbot_plugin_blog_manager/models.py`
+- `astrbot_plugin_blog_manager/services/search_service.py`
+- `astrbot_plugin_blog_manager/services/agent_service.py`
+- `astrbot_plugin_blog_manager/services/blog_service.py`
+- `astrbot_plugin_blog_manager/tools/blog_tools.py`
+- `tests/test_daily_report.py`
+- `tests/test_search_service.py`
+
 ### 1. 禁止中文 slug
 
 - `slugify()` 已改为只生成 ASCII kebab-case。
@@ -75,7 +113,7 @@ pytest
 结果：
 
 ```text
-24 passed
+26 passed
 ```
 
 ## 后续建议

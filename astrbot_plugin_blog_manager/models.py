@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Any
 
 
@@ -16,6 +17,29 @@ class BlogGenerateRequest:
     tone: str = "专业、清晰"
     immediate_publish: bool = False
     image_preference: str = "auto"
+
+
+@dataclass(slots=True)
+class NewsItem:
+    """A compact news item collected for daily report generation."""
+
+    title: str
+    summary: str
+    url: str
+    source: str = ""
+
+    def to_prompt_line(self, index: int) -> str:
+        source = f" 来源：{self.source}" if self.source else ""
+        return f"{index}. {self.title}{source}\n摘要：{self.summary}\n链接：{self.url}"
+
+
+@dataclass(slots=True)
+class DailyReportRequest:
+    """Normalized request for generating an AI daily report."""
+
+    report_date: date
+    extra_instructions: str = ""
+    immediate_publish: bool = True
 
 
 @dataclass(slots=True)
