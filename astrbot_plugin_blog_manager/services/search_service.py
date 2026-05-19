@@ -14,9 +14,11 @@ from ..models import NewsItem
 
 
 DEFAULT_AI_NEWS_QUERIES = [
-    "AI news today",
-    "人工智能 最新进展",
-    "LLM breakthroughs",
+    "latest large language model releases today",
+    "AI product launch OpenAI Anthropic Google DeepMind Meta today",
+    "LLM agent multimodal AI model release",
+    "开源大模型 发布 多模态 Agent 最新",
+    "AI 产品发布 大模型 API 最新",
 ]
 
 

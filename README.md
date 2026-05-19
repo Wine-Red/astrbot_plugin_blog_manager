@@ -94,8 +94,8 @@ Hello Astro
 `/blog daily` 会执行以下流程：
 
 - 使用 AstrBot 自带搜索能力抓取今日 AI 新闻
-- 默认搜索关键词包括 `AI news today`、`人工智能 最新进展`、`LLM breakthroughs`
-- 汇总至少 3 条新闻源后，生成包含数据源分析、逐条深度解读和综合判断的 Markdown 日报
+- 默认搜索更偏向前沿大模型、产品发布、Agent、多模态、开源模型和 API 动态，弱化就业等泛社会议题
+- 搜索不足 3 条新闻时仍会由日报工具生成 AI 日报概览，不会退回普通写文章工具
 - 优先调用 AstrBot Context 生图能力；若不可用，会生成 Pollinations 封面图 URL
 - 正文会插入封面图，并为重点新闻生成统一风格的新闻配图
 - 使用 Firefly frontmatter：
