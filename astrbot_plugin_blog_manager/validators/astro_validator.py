@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import date
 
 from pathlib import PurePosixPath
+import re
 from typing import Any, Mapping
 
 import yaml
@@ -11,6 +12,9 @@ import yaml
 from ..constants import DEFAULT_CONTENT_DIR
 from ..models import AstroArticleDraft, ValidationIssue, ValidationResult
 from ..utils.markdown import extract_image_urls, parse_frontmatter
+
+
+ASCII_SLUG_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 
 class AstroValidator:
@@ -31,6 +35,10 @@ class AstroValidator:
             issues.append(ValidationIssue("description", "描述不能为空。"))
         if not draft.body.strip():
             issues.append(ValidationIssue("body", "正文不能为空。"))
+        if not ASCII_SLUG_PATTERN.fullmatch(draft.slug):
+            issues.append(
+                ValidationIssue("slug", "slug 只能使用 ASCII 小写字母、数字和连字符。")
+            )
         tags = draft.frontmatter.get("tags", [])
         if not isinstance(tags, list) or not [tag for tag in tags if str(tag).strip()]:
             issues.append(ValidationIssue("tags", "至少需要一个标签。"))
@@ -62,8 +70,13 @@ class AstroValidator:
         if updated is not None and not isinstance(updated, date):
             issues.append(ValidationIssue("updated", "updated 必须是日期。"))
         slug = draft.frontmatter.get("slug")
-        if slug is not None and not isinstance(slug, str):
-            issues.append(ValidationIssue("slug", "slug 必须是字符串。"))
+        if slug is not None:
+            if not isinstance(slug, str):
+                issues.append(ValidationIssue("slug", "slug 必须是字符串。"))
+            elif not ASCII_SLUG_PATTERN.fullmatch(slug):
+                issues.append(
+                    ValidationIssue("slug", "frontmatter slug 只能使用 ASCII 小写字母、数字和连字符。")
+                )
 
         try:
             yaml.safe_dump(draft.frontmatter, allow_unicode=True, sort_keys=False)

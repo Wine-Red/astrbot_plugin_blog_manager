@@ -8,7 +8,12 @@ from typing import Any, Mapping
 import yaml
 
 from ..clients.github_client import GitHubClient
-from ..constants import DEFAULT_BRANCH_PREFIX, DEFAULT_CONTENT_DIR, DEFAULT_WRITE_MODE
+from ..constants import (
+    DEFAULT_BRANCH_PREFIX,
+    DEFAULT_CONTENT_DIR,
+    DEFAULT_WRITE_MODE,
+    SUPPORTED_WRITE_MODES,
+)
 from ..exceptions import PluginConfigError
 from ..models import (
     ArticleSummary,
@@ -19,6 +24,7 @@ from ..models import (
     RepoFileChange,
 )
 from ..utils.datetime_utils import utc_now
+from ..utils.slug import slugify
 
 
 class RepositoryService:
@@ -74,8 +80,9 @@ class RepositoryService:
         extra_changes: list[RepoFileChange],
         action_label: str,
     ) -> PublishResult:
-        default_branch = str(self.config.get("default_branch", "main"))
-        write_mode = str(self.config.get("write_mode", DEFAULT_WRITE_MODE))
+        article_path = self._ensure_article_path_allowed(article_path)
+        default_branch = self._default_branch()
+        write_mode = self._write_mode()
         branch = default_branch
         if write_mode == "pr":
             branch = await self._ensure_work_branch(default_branch, slug)
@@ -135,8 +142,8 @@ class RepositoryService:
         return await self.client.merge_pull_request(number=number, method=method)
 
     async def list_articles(self, *, limit: int = 10) -> list[ArticleSummary]:
-        default_branch = str(self.config.get("default_branch", "main"))
-        content_dir = str(self.config.get("content_dir", DEFAULT_CONTENT_DIR)).strip("/")
+        default_branch = self._default_branch()
+        content_dir = self._content_dir()
         items = await self.client.list_directory(content_dir, default_branch)
         files = [
             str(item.get("path", ""))
@@ -147,7 +154,8 @@ class RepositoryService:
         ]
         files.sort(reverse=True)
         summaries: list[ArticleSummary] = []
-        for path in files[: max(1, limit)]:
+        safe_limit = min(max(1, limit), 50)
+        for path in files[:safe_limit]:
             try:
                 content, _ = await self.client.get_file_content(path, default_branch)
             except Exception:
@@ -157,13 +165,13 @@ class RepositoryService:
         return summaries
 
     async def delete_article(self, *, target: str) -> DeleteResult:
-        default_branch = str(self.config.get("default_branch", "main"))
-        write_mode = str(self.config.get("write_mode", DEFAULT_WRITE_MODE))
+        default_branch = self._default_branch()
+        write_mode = self._write_mode()
+        delete_path = await self._resolve_article_path(target=target, branch=default_branch)
         branch = default_branch
         if write_mode == "pr":
             branch = await self._ensure_work_branch(default_branch, self._branch_slug(target))
 
-        delete_path = await self._resolve_article_path(target=target, branch=default_branch)
         sha = await self.client.get_file_sha(delete_path, branch if write_mode == "pr" else default_branch)
         if not sha:
             raise PluginConfigError(f"找不到要删除的文章：{target}")
@@ -199,7 +207,7 @@ class RepositoryService:
         )
 
     async def get_article(self, *, target: str) -> tuple[ArticleSummary, str]:
-        default_branch = str(self.config.get("default_branch", "main"))
+        default_branch = self._default_branch()
         article_path = await self._resolve_article_path(target=target, branch=default_branch)
         content, _ = await self.client.get_file_content(article_path, default_branch)
         title, slug = self._extract_article_metadata(article_path, content)
@@ -215,9 +223,9 @@ class RepositoryService:
     async def _resolve_article_path(self, *, target: str, branch: str) -> str:
         normalized = target.strip().replace("\\", "/").strip("/")
         if "/" in normalized or normalized.endswith(".md") or normalized.endswith(".mdx"):
-            return normalized
+            return self._ensure_article_path_allowed(normalized)
 
-        content_dir = str(self.config.get("content_dir", DEFAULT_CONTENT_DIR)).strip("/")
+        content_dir = self._content_dir()
         items = await self.client.list_directory(content_dir, branch)
         matches: list[str] = []
         slug = normalized.lower()
@@ -243,10 +251,45 @@ class RepositoryService:
             )
         return matches[0]
 
+    def _default_branch(self) -> str:
+        return str(self.config.get("default_branch", "main")).strip() or "main"
+
+    def _write_mode(self) -> str:
+        write_mode = str(self.config.get("write_mode", DEFAULT_WRITE_MODE)).strip().lower()
+        if write_mode not in SUPPORTED_WRITE_MODES:
+            raise PluginConfigError(
+                f"write_mode 必须是 {', '.join(sorted(SUPPORTED_WRITE_MODES))} 之一。"
+            )
+        return write_mode
+
+    def _content_dir(self) -> str:
+        content_dir = (
+            str(self.config.get("content_dir", DEFAULT_CONTENT_DIR))
+            .strip()
+            .replace("\\", "/")
+            .strip("/")
+        )
+        if not content_dir or ".." in PurePosixPath(content_dir).parts:
+            raise PluginConfigError("content_dir 不能为空，且不能包含上级目录引用。")
+        return content_dir
+
+    def _ensure_article_path_allowed(self, path: str) -> str:
+        normalized = path.strip().replace("\\", "/").strip("/")
+        path_obj = PurePosixPath(normalized)
+        if not normalized or ".." in path_obj.parts:
+            raise PluginConfigError("文章路径不能为空，且不能包含上级目录引用。")
+        if path_obj.suffix.lower() not in {".md", ".mdx"}:
+            raise PluginConfigError("文章路径必须以 .md 或 .mdx 结尾。")
+
+        content_root = PurePosixPath(self._content_dir())
+        if content_root not in path_obj.parents:
+            raise PluginConfigError("文章路径必须位于配置的 content_dir 下。")
+        return path_obj.as_posix()
+
     def _branch_slug(self, target: str) -> str:
         cleaned = target.strip().replace("\\", "/").replace("/", "-")
         cleaned = cleaned.strip("-") or "delete-article"
-        return cleaned
+        return slugify(cleaned, default="delete-article")
 
     def _extract_article_metadata(self, path: str, content: str) -> tuple[str, str]:
         slug = PurePosixPath(path).stem

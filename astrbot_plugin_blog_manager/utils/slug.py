@@ -1,40 +1,27 @@
-"""Helpers for generating stable article slugs."""
+"""Helpers for generating stable ASCII article slugs."""
 
 from __future__ import annotations
 
+import hashlib
 import re
 import unicodedata
 
 
 def slugify(value: str, default: str = "untitled-post") -> str:
-    """Create a slug suitable for Astro content paths, preserving CJK text."""
+    """Create an ASCII kebab-case slug suitable for Astro content paths.
 
-    normalized = unicodedata.normalize("NFKC", value).lower().strip()
-    normalized = re.sub(r"[\s/_.]+", "-", normalized)
+    Non-ASCII text is deliberately not preserved. If no ASCII token can be
+    derived, a stable short hash is appended to the ASCII-normalized default.
+    """
 
-    chars: list[str] = []
-    previous_hyphen = False
-    for char in normalized:
-        if char.isalnum() or _is_cjk(char):
-            chars.append(char)
-            previous_hyphen = False
-            continue
-        if not previous_hyphen:
-            chars.append("-")
-            previous_hyphen = True
+    text = unicodedata.normalize("NFKD", value)
+    ascii_text = text.encode("ascii", "ignore").decode("ascii")
+    normalized = ascii_text.lower().strip()
+    normalized = re.sub(r"[^a-z0-9]+", "-", normalized)
+    slug = re.sub(r"-{2,}", "-", normalized).strip("-")
+    if slug:
+        return slug
 
-    slug = "".join(chars).strip("-")
-    slug = re.sub(r"-{2,}", "-", slug)
-    return slug or default
-
-
-def _is_cjk(char: str) -> bool:
-    code = ord(char)
-    return (
-        0x4E00 <= code <= 0x9FFF
-        or 0x3400 <= code <= 0x4DBF
-        or 0x20000 <= code <= 0x2A6DF
-        or 0x2A700 <= code <= 0x2B73F
-        or 0x2B740 <= code <= 0x2B81F
-        or 0x2B820 <= code <= 0x2CEAF
-    )
+    fallback = re.sub(r"[^a-z0-9]+", "-", default.lower()).strip("-") or "post"
+    digest = hashlib.sha1(value.encode("utf-8")).hexdigest()[:8]
+    return f"{fallback}-{digest}"

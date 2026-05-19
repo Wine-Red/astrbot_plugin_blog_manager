@@ -101,3 +101,46 @@ def test_validator_rejects_rendered_frontmatter_missing_required_fields():
 
     assert result.valid is False
     assert any(issue.field == "rendered_published" for issue in result.issues)
+
+
+def test_validator_rejects_non_ascii_slug():
+    validator = AstroValidator(
+        {
+            "content_dir": "src/content/posts",
+            "required_frontmatter_fields": ["title", "published", "slug"],
+            "image_mode": "external",
+        }
+    )
+    draft = AstroArticleDraft(
+        title="中文标题",
+        description="描述",
+        body="# Hello",
+        slug="中文标题",
+        article_path="src/content/posts/2026-01-01-post.md",
+        frontmatter={
+            "title": "中文标题",
+            "description": "描述",
+            "published": date(2026, 1, 1),
+            "slug": "中文标题",
+            "category": "技术",
+            "tags": ["Astro", "博客"],
+        },
+        rendered_content=(
+            "---\n"
+            "title: 中文标题\n"
+            "description: 描述\n"
+            "published: 2026-01-01\n"
+            "slug: 中文标题\n"
+            "category: 技术\n"
+            "tags:\n"
+            "- Astro\n"
+            "- 博客\n"
+            "---\n\n"
+            "# Hello\n"
+        ),
+    )
+
+    result = validator.validate(draft)
+
+    assert result.valid is False
+    assert any(issue.field == "slug" for issue in result.issues)

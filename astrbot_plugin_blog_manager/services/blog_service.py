@@ -6,7 +6,12 @@ from typing import Any, Mapping
 
 from ..adapters.astro_adapter import AstroAdapter
 from ..adapters.frontmatter_adapter import build_frontmatter
-from ..constants import DEFAULT_REQUIRED_FRONTMATTER_FIELDS
+from ..constants import (
+    DEFAULT_REQUIRED_FRONTMATTER_FIELDS,
+    SUPPORTED_ARTICLE_FORMATS,
+    SUPPORTED_IMAGE_MODES,
+    SUPPORTED_WRITE_MODES,
+)
 from ..exceptions import AstroValidationError, PluginConfigError
 from ..models import (
     ArticleSummary,
@@ -55,6 +60,15 @@ class BlogService:
         )
         lines.append(f"default_branch_value: {self.config.get('default_branch', '')}")
         lines.append(f"write_mode_value: {self.config.get('write_mode', '')}")
+        lines.extend(
+            self._option_check_lines(
+                {
+                    "write_mode": SUPPORTED_WRITE_MODES,
+                    "article_format": SUPPORTED_ARTICLE_FORMATS,
+                    "image_mode": SUPPORTED_IMAGE_MODES,
+                }
+            )
+        )
         required_frontmatter = self.config.get(
             "required_frontmatter_fields", DEFAULT_REQUIRED_FRONTMATTER_FIELDS
         )
@@ -176,3 +190,15 @@ class BlogService:
         for key in ("github_token", "github_owner", "github_repo"):
             if not str(self.config.get(key, "")).strip():
                 raise PluginConfigError(f"缺少 GitHub 配置项: {key}")
+
+    def _option_check_lines(self, options: Mapping[str, set[str]]) -> list[str]:
+        lines: list[str] = []
+        for key, supported_values in options.items():
+            value = str(self.config.get(key, "")).strip().lower()
+            if not value:
+                continue
+            if value not in supported_values:
+                lines.append(
+                    f"{key}_valid: INVALID，应为 {', '.join(sorted(supported_values))} 之一"
+                )
+        return lines

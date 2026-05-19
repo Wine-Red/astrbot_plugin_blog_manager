@@ -47,6 +47,7 @@
 - `asset_dir`: `src/assets/blog`
 - `article_format`: `md` 或 `mdx`
 - `write_mode`: 首次接入建议使用 `pr`
+- `slug`: 文章 slug 会被强制规范为 ASCII kebab-case，不允许中文 slug
 
 ## GitHub 权限要求
 
@@ -95,6 +96,7 @@ Hello Astro
 - frontmatter 可正常序列化为 YAML
 - 必填字段齐全
 - `title`、`description`、`pubDate`、`slug` 类型合理
+- `slug` 只能包含 ASCII 小写字母、数字和连字符
 - 正文非空
 - 输出路径位于配置的 `content_dir` 下
 - 图片引用与 `image_mode` 一致
