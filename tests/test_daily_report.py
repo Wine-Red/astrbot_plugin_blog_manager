@@ -29,6 +29,11 @@ class FakeSearchService:
         ]
 
 
+class EmptySearchService:
+    async def search_news(self, queries, *, limit=5):
+        return []
+
+
 def test_blog_service_generates_daily_draft_with_firefly_frontmatter():
     service = BlogService(
         context=None,
@@ -50,5 +55,38 @@ def test_blog_service_generates_daily_draft_with_firefly_frontmatter():
     assert draft.frontmatter["tags"][:3] == ["AI", "日报", "人工智能"]
     assert draft.frontmatter["image"].startswith("https://image.pollinations.ai/prompt/")
     assert "## 开篇语" in draft.body
-    assert "## 新闻列表" in draft.body
+    assert "## 今日数据源概览" in draft.body
+    assert "## 新闻深度分析" in draft.body
+    assert "## 综合判断" in draft.body
+    assert "![AI 日报封面]" in draft.body
+    assert "![OpenAI releases new agent tools]" in draft.body
     assert "[example.com](https://example.com/openai-agent)" in draft.body
+
+
+def test_blog_service_generates_daily_draft_from_supplied_news_when_search_empty():
+    service = BlogService(
+        context=None,
+        config={
+            "content_dir": "src/content/posts",
+            "required_frontmatter_fields": ["title", "published"],
+            "image_mode": "external",
+            "article_format": "md",
+        },
+    )
+    service.search_service = EmptySearchService()
+    instructions = """
+    1. AI影响就业：AI正在影响应届毕业生进入就业市场，技术行业发生变化。
+    2. 汽车行业AI盈利困难：调查显示汽车制造商难以从AI中获利。
+    3. AI安全漏洞：https://example.com/security Pwn2Own柏林大赛发现AI数据库零日漏洞。
+    """
+
+    draft = asyncio.run(
+        service.generate_daily_draft(
+            report_date=date(2026, 5, 19),
+            extra_instructions=instructions,
+        )
+    )
+
+    assert draft.slug == "ai-daily-2026-05-19"
+    assert "AI影响就业" in draft.body
+    assert "https://example.com/security" in draft.body

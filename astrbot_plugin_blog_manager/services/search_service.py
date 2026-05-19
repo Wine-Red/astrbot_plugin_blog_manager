@@ -5,7 +5,7 @@ from __future__ import annotations
 import html
 import re
 from typing import Any
-from urllib.parse import parse_qs, quote_plus, unquote, urlparse
+from urllib.parse import quote_plus, urlparse
 
 from ..exceptions import SearchDisabledError
 from ..models import NewsItem
@@ -19,7 +19,7 @@ DEFAULT_AI_NEWS_QUERIES = [
 
 
 class SearchService:
-    """Collect news items from AstrBot search hooks or DuckDuckGo HTML."""
+    """Collect news items from AstrBot built-in search hooks."""
 
     def __init__(self, enabled: bool = True, context: Any | None = None):
         self.enabled = enabled
@@ -45,8 +45,6 @@ class SearchService:
         seen_urls: set[str] = set()
         for query in queries:
             query_items = await self._search_with_context(query)
-            if not query_items:
-                query_items = await self._search_duckduckgo(query)
             for item in query_items:
                 url = item.url.strip()
                 if not url or url in seen_urls:
@@ -61,20 +59,34 @@ class SearchService:
         if self.context is None:
             return []
 
-        for method_name in ("web_search", "search_web", "search"):
+        for method_name in (
+            "web_search",
+            "search_web",
+            "search",
+            "search_tool",
+            "builtin_search",
+        ):
             method = getattr(self.context, method_name, None)
             if not callable(method):
                 continue
-            try:
-                raw_results = await method(query)
-            except Exception:
-                continue
-            parsed = self._parse_context_results(raw_results)
-            if parsed:
-                return parsed
+            call_attempts = (
+                lambda: method(query),
+                lambda: method(query=query, topic="news", time_range="day", max_results=10),
+                lambda: method(query=query, max_results=10),
+            )
+            for build_call in call_attempts:
+                try:
+                    raw_results = await build_call()
+                except Exception:
+                    continue
+                parsed = self._parse_context_results(raw_results)
+                if parsed:
+                    return parsed
         return []
 
     def _parse_context_results(self, raw_results: Any) -> list[NewsItem]:
+        if isinstance(raw_results, dict):
+            raw_results = raw_results.get("results") or raw_results.get("items") or []
         if not isinstance(raw_results, list):
             return []
 
@@ -104,23 +116,6 @@ class SearchService:
                 )
         return items
 
-    async def _search_duckduckgo(self, query: str) -> list[NewsItem]:
-        try:
-            import httpx
-        except ImportError:
-            return []
-
-        url = f"https://duckduckgo.com/html/?q={quote_plus(query)}"
-        headers = {"User-Agent": "astrbot-plugin-blog-manager/1.0"}
-        try:
-            async with httpx.AsyncClient(timeout=20.0, headers=headers, follow_redirects=True) as client:
-                response = await client.get(url)
-        except httpx.HTTPError:
-            return []
-        if response.status_code >= 400:
-            return []
-        return parse_duckduckgo_html(response.text)
-
     def _source_from_url(self, url: str) -> str:
         hostname = urlparse(url).netloc.lower()
         if hostname.startswith("www."):
@@ -128,48 +123,37 @@ class SearchService:
         return hostname
 
 
-def parse_duckduckgo_html(document: str) -> list[NewsItem]:
-    """Parse DuckDuckGo HTML results without third-party parser dependencies."""
+def parse_news_items_from_text(text: str) -> list[NewsItem]:
+    """Extract user-supplied news snippets from plain text instructions."""
 
-    pattern = re.compile(
-        r'<a[^>]+class="result__a"[^>]+href="(?P<href>[^"]+)"[^>]*>(?P<title>.*?)</a>'
-        r".*?"
-        r'(?:<a[^>]+class="result__snippet"[^>]*>(?P<snippet_a>.*?)</a>|'
-        r'<div[^>]+class="result__snippet"[^>]*>(?P<snippet_div>.*?)</div>)',
-        re.IGNORECASE | re.DOTALL,
-    )
+    chunks = re.split(r"\n\s*(?:\d+[\).、]|[-*])\s+", "\n" + text.strip())
     items: list[NewsItem] = []
-    for match in pattern.finditer(document):
-        raw_url = html.unescape(match.group("href"))
-        title = _strip_html(match.group("title"))
-        summary = _strip_html(match.group("snippet_a") or match.group("snippet_div") or "")
-        url = _normalize_duckduckgo_url(raw_url)
-        if not title or not url:
+    for chunk in chunks:
+        chunk = chunk.strip()
+        if not chunk:
             continue
-        items.append(
-            NewsItem(
-                title=title,
-                summary=summary or title,
-                url=url,
-                source=_source_from_url(url),
+        url_match = re.search(r"https?://[^\s)）]+", chunk)
+        url = url_match.group(0).rstrip(".,;，。；") if url_match else ""
+        title = chunk.splitlines()[0].strip(" -：:")
+        title = re.sub(r"https?://\S+", "", title).strip(" -：:")
+        summary = re.sub(r"https?://\S+", "", chunk).strip()
+        if len(title) > 120:
+            title = title[:120].rstrip() + "..."
+        if title and (url or len(summary) >= 12):
+            items.append(
+                NewsItem(
+                    title=title,
+                    summary=summary or title,
+                    url=url or f"https://www.google.com/search?q={quote_plus(title)}",
+                    source=_source_from_url(url) if url else "用户提供",
+                )
             )
-        )
     return items
 
 
 def _strip_html(value: str) -> str:
     text = re.sub(r"<[^>]+>", "", value)
     return html.unescape(text).strip()
-
-
-def _normalize_duckduckgo_url(value: str) -> str:
-    if value.startswith("//"):
-        value = "https:" + value
-    parsed = urlparse(value)
-    query = parse_qs(parsed.query)
-    if "uddg" in query and query["uddg"]:
-        return unquote(query["uddg"][0])
-    return value
 
 
 def _source_from_url(url: str) -> str:

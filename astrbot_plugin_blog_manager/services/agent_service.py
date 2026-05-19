@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from typing import Any, Mapping
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlparse
 
 from ..constants import DEFAULT_AGENT_SYSTEM_PROMPT, FIREFLY_FRONTMATTER_TEMPLATE_TEXT
 from ..models import AstroArticleDraft, BlogGenerateRequest, DailyReportRequest, ImageAsset, NewsItem
@@ -198,18 +198,21 @@ class AgentService:
         )
         report_date = request.report_date.isoformat()
         return (
-            "你是一个严谨的 AI 行业日报编辑。请只输出 JSON，不要输出额外解释。"
+            "你是一个严谨的 AI 行业研究员和日报编辑。请只输出 JSON，不要输出额外解释。"
             "JSON 字段必须包含：`title`, `description`, `core_keyword`, `body`。\n"
             "你必须基于给定新闻源生成内容，不要编造来源链接。\n"
             "标题必须符合：AI 日报-日期："
             f"{report_date}：<主标题>。\n"
             "description 必须符合：今日 AI 核心速览：<一句话总结>。\n"
-            "正文必须严格包含以下结构：\n"
-            "1. 开篇语：一段简短、有人情味的今日 AI 趋势总结。\n"
-            "2. 新闻列表：每条新闻使用二级或三级标题，必须包含核心摘要、深度解读、来源链接。\n"
-            "3. 格式鲜明：多使用 `> ` 引用块、`---` 分割线和 `- ` 列表。\n"
-            "核心摘要必须用 Markdown 加粗强调关键公司、技术或数据。\n"
+            "正文必须严格包含以下结构，并且内容必须具体、扎实，禁止空泛总结：\n"
+            "1. 开篇语：2 到 3 段，说明今天 AI 行业的主线、冲突点和可能影响。\n"
+            "2. 今日数据源概览：列出每个来源、链接、信息类型、可能立场或局限。\n"
+            "3. 新闻深度分析：每条新闻使用二级或三级标题，必须包含核心事实、数据源分析、为什么重要、影响对象、后续观察点、来源链接。\n"
+            "4. 综合判断：把多条新闻串起来，给出产业、技术和监管三方面判断。\n"
+            "5. 格式鲜明：多使用 `> ` 引用块、`---` 分割线和 `- ` 列表。\n"
+            "核心事实必须用 Markdown 加粗强调关键公司、技术、时间、数字或裁决结果。\n"
             "来源链接必须使用 Markdown 链接格式。\n"
+            "每条新闻的深度分析至少 2 段，不要只写一句“值得关注”。\n"
             "不要生成 frontmatter，不要生成 slug。\n\n"
             f"日报日期：{report_date}\n"
             f"封面图 URL：{cover_image_url or '无'}\n"
@@ -290,7 +293,8 @@ class AgentService:
         if not description.startswith("今日 AI 核心速览："):
             description = f"今日 AI 核心速览：{description or self._daily_description(news_items)}"
         core_keyword = str(payload.get("core_keyword", "")).strip() or self._core_keyword(news_items)
-        body = str(payload.get("body", "")).strip() or self._fallback_daily_body(news_items)
+        body = str(payload.get("body", "")).strip() or self._fallback_daily_body(news_items, cover_image_url=cover_image_url)
+        body = self._ensure_daily_images(body, news_items, cover_image_url=cover_image_url)
         return AstroArticleDraft(
             title=title,
             description=description,
@@ -311,7 +315,7 @@ class AgentService:
         return AstroArticleDraft(
             title=self._daily_title(report_date),
             description=f"今日 AI 核心速览：{self._daily_description(news_items)}",
-            body=self._fallback_daily_body(news_items),
+            body=self._fallback_daily_body(news_items, cover_image_url=cover_image_url),
             slug=f"ai-daily-{report_date}",
             frontmatter={"category": "AI资讯", "image": cover_image_url},
             tags=["AI", "日报", "人工智能", self._core_keyword(news_items)],
@@ -357,32 +361,77 @@ class AgentService:
                 return candidate
         return "大模型"
 
-    def _fallback_daily_body(self, news_items: list[NewsItem]) -> str:
+    def _fallback_daily_body(
+        self,
+        news_items: list[NewsItem],
+        *,
+        cover_image_url: str = "",
+    ) -> str:
         lines = [
+            f"![AI 日报封面]({cover_image_url})" if cover_image_url else "",
+            "",
             "## 开篇语",
             "",
-            "今天的 AI 行业继续沿着模型能力、产品落地和基础设施三条线推进。下面这份日报聚焦值得关注的公开信息，帮助你快速把握今日脉络。",
+            "今天的 AI 行业动态不只是单点新闻的堆叠，而是在基础设施、产业应用、安全治理和资本叙事之间形成相互牵引。下面的日报会逐条拆解搜索工具返回的数据源，重点看事实本身、来源视角，以及它们对行业判断的意义。",
+            "",
+            "如果一条新闻来自媒体报道，它更适合观察公共叙事和政策/市场关注点；如果来自企业公告或市场资讯，它更适合提取产品、客户、指标和商业动作，但需要警惕营销口径。本文会把这些差异写清楚，而不是只给结论。",
             "",
             "---",
             "",
-            "## 新闻列表",
+            "## 今日数据源概览",
             "",
         ]
         for index, item in enumerate(news_items, start=1):
             lines.extend(
                 [
+                    f"- **来源 {index}**：[{item.source or self._source_label(item.url) or '原文'}]({item.url})",
+                    f"  - 标题：{item.title}",
+                    f"  - 可用信息：{item.summary}",
+                    f"  - 来源解读：{self._source_analysis(item)}",
+                ]
+            )
+        lines.extend(
+            [
+                "",
+                "---",
+                "",
+                "## 新闻深度分析",
+                "",
+            ]
+        )
+        for index, item in enumerate(news_items, start=1):
+            illustration = self._news_illustration_url(item)
+            lines.extend(
+                [
                     f"### {index}. {item.title}",
                     "",
-                    f"> 来源：[{item.source or '原文'}]({item.url})",
+                    f"![{item.title}]({illustration})",
                     "",
-                    f"- **核心摘要**：{item.summary}",
-                    "- **深度解读**：这条动态值得关注，因为它可能影响模型能力演进、产品竞争格局或 AI 基础设施投入节奏。",
+                    f"> 来源：[{item.source or self._source_label(item.url) or '原文'}]({item.url})",
+                    "",
+                    f"- **核心事实**：{item.summary}",
+                    f"- **数据源分析**：{self._source_analysis(item)}",
+                    "",
+                    "这条信息的重要性首先在于它反映了 AI 从模型能力竞争转向真实业务约束的过程。无论是算力、数据、就业、汽车、制造还是安全漏洞，新闻背后都不是单纯的“AI 更强了”，而是组织如何把 AI 嵌入预算、流程、风险控制和产品责任。",
+                    "",
+                    "进一步看，这类动态通常会影响三类对象：一是企业决策者，他们需要判断 AI 投入是否能形成可衡量回报；二是开发者和产品团队，他们需要把新能力转化为稳定流程；三是监管者和用户，他们关心安全、透明度和责任归属。后续应继续观察是否出现更明确的指标、客户案例、监管动作或技术复现。",
+                    "",
                     f"- **来源链接**：[{item.source or item.title}]({item.url})",
                     "",
                     "---",
                     "",
                 ]
             )
+        lines.extend(
+            [
+                "## 综合判断",
+                "",
+                "- **产业侧**：今天的新闻更强调 AI 的落地成本、盈利难题和基础设施转向，说明企业已经从概念验证进入回报核算阶段。",
+                "- **技术侧**：大模型、Agent、安全工具和智能制造仍是高频主题，但价值判断越来越依赖真实场景中的稳定性、可解释性和集成成本。",
+                "- **治理侧**：诉讼、漏洞披露、监控应用和就业影响共同说明，AI 行业的竞争已经进入法律、伦理和社会接受度共同约束的阶段。",
+                "",
+            ]
+        )
         if not news_items:
             lines.extend(
                 [
@@ -396,3 +445,51 @@ class AgentService:
                 ]
             )
         return "\n".join(lines).strip() + "\n"
+
+    def _ensure_daily_images(
+        self,
+        body: str,
+        news_items: list[NewsItem],
+        *,
+        cover_image_url: str = "",
+    ) -> str:
+        output = body.strip()
+        if cover_image_url and cover_image_url not in output:
+            output = f"![AI 日报封面]({cover_image_url})\n\n{output}"
+        if "![新闻配图" in output:
+            return output + "\n"
+        gallery: list[str] = ["", "---", "", "## 相关新闻配图", ""]
+        for index, item in enumerate(news_items[:5], start=1):
+            gallery.extend(
+                [
+                    f"![新闻配图 {index}：{item.title}]({self._news_illustration_url(item)})",
+                    "",
+                    f"- 图示主题：{item.title}",
+                    f"- 来源：[{item.source or self._source_label(item.url) or '原文'}]({item.url})",
+                    "",
+                ]
+            )
+        return output + "\n".join(gallery).rstrip() + "\n"
+
+    def _news_illustration_url(self, item: NewsItem) -> str:
+        prompt = (
+            "editorial illustration for AI industry news, clean data journalism style, "
+            f"topic: {item.title}, source: {item.source or self._source_label(item.url)}"
+        )
+        return f"https://image.pollinations.ai/prompt/{quote_plus(prompt)}?width=1000&height=560&nologo=true"
+
+    def _source_label(self, url: str) -> str:
+        hostname = urlparse(url).netloc.lower()
+        if hostname.startswith("www."):
+            hostname = hostname[4:]
+        return hostname
+
+    def _source_analysis(self, item: NewsItem) -> str:
+        source = (item.source or self._source_label(item.url)).lower()
+        if any(name in source for name in ("cnn", "washingtonpost", "forbes")):
+            return "媒体来源，适合观察公共议题、行业叙事和事件影响，但需要结合原始公告或判决文本交叉验证细节。"
+        if any(name in source for name in ("ft.com", "markets", "prnewswire", "stocktitan")):
+            return "公告或市场资讯来源，适合提取公司动作、产品信息和数字指标，但可能带有企业传播口径。"
+        if source == "用户提供":
+            return "用户提供的检索摘要，适合快速形成线索，但发布前最好补充原始链接或二次来源。"
+        return "公开网页来源，适合提取事件线索；判断重要性时需要关注其发布时间、引用对象和是否提供原始数据。"

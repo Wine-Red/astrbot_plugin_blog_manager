@@ -30,7 +30,11 @@ from ..utils.markdown import parse_frontmatter, render_markdown_document
 from ..validators.astro_validator import AstroValidator
 from .agent_service import AgentService
 from .publish_service import PublishService
-from .search_service import DEFAULT_AI_NEWS_QUERIES, SearchService
+from .search_service import (
+    DEFAULT_AI_NEWS_QUERIES,
+    SearchService,
+    parse_news_items_from_text,
+)
 
 
 class BlogService:
@@ -112,7 +116,7 @@ class BlogService:
         extra_instructions: str = "",
         report_date: date | None = None,
     ) -> AstroArticleDraft:
-        news_items = await self._collect_daily_news()
+        news_items = await self._collect_daily_news(extra_instructions)
         request = DailyReportRequest(
             report_date=report_date or date.today(),
             extra_instructions=extra_instructions,
@@ -254,14 +258,26 @@ class BlogService:
             if not str(self.config.get(key, "")).strip():
                 raise PluginConfigError(f"缺少 GitHub 配置项: {key}")
 
-    async def _collect_daily_news(self) -> list[NewsItem]:
-        news_items = await self.search_service.search_news(
-            DEFAULT_AI_NEWS_QUERIES,
-            limit=5,
-        )
+    async def _collect_daily_news(self, extra_instructions: str = "") -> list[NewsItem]:
+        supplied_items = parse_news_items_from_text(extra_instructions)
+        news_items = await self.search_service.search_news(DEFAULT_AI_NEWS_QUERIES, limit=8)
+        news_items = self._merge_news_items([*supplied_items, *news_items], limit=5)
         if len(news_items) < 3:
             raise PluginConfigError("未获取到至少 3 条可用 AI 新闻，日报生成已中止。")
         return news_items
+
+    def _merge_news_items(self, items: list[NewsItem], *, limit: int) -> list[NewsItem]:
+        merged: list[NewsItem] = []
+        seen: set[str] = set()
+        for item in items:
+            key = item.url.strip() or item.title.strip().lower()
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            merged.append(item)
+            if len(merged) >= limit:
+                break
+        return merged
 
     def _option_check_lines(self, options: Mapping[str, set[str]]) -> list[str]:
         lines: list[str] = []
