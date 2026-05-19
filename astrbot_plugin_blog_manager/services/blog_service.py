@@ -122,8 +122,9 @@ class BlogService:
             extra_instructions=extra_instructions,
             immediate_publish=False,
         )
+        cover_headline = news_items[0].title if news_items else "今日 AI 行业概览"
         cover_image_url = await self.agent_service.generate_cover_image(
-            news_items[0].title,
+            cover_headline,
             event=event,
         )
         draft = await self.agent_service.generate_daily_report(
@@ -260,10 +261,11 @@ class BlogService:
 
     async def _collect_daily_news(self, extra_instructions: str = "") -> list[NewsItem]:
         supplied_items = parse_news_items_from_text(extra_instructions)
-        news_items = await self.search_service.search_news(DEFAULT_AI_NEWS_QUERIES, limit=8)
+        try:
+            news_items = await self.search_service.search_news(DEFAULT_AI_NEWS_QUERIES, limit=8)
+        except Exception:
+            news_items = []
         news_items = self._merge_news_items([*supplied_items, *news_items], limit=5)
-        if len(news_items) < 3:
-            raise PluginConfigError("未获取到至少 3 条可用 AI 新闻，日报生成已中止。")
         return news_items
 
     def _merge_news_items(self, items: list[NewsItem], *, limit: int) -> list[NewsItem]:

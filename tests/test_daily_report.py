@@ -34,6 +34,11 @@ class EmptySearchService:
         return []
 
 
+class FailingSearchService:
+    async def search_news(self, queries, *, limit=5):
+        raise RuntimeError("search unavailable")
+
+
 def test_blog_service_generates_daily_draft_with_firefly_frontmatter():
     service = BlogService(
         context=None,
@@ -90,3 +95,41 @@ def test_blog_service_generates_daily_draft_from_supplied_news_when_search_empty
     assert draft.slug == "ai-daily-2026-05-19"
     assert "AI影响就业" in draft.body
     assert "https://example.com/security" in draft.body
+
+
+def test_blog_service_generates_daily_overview_when_no_news_available():
+    service = BlogService(
+        context=None,
+        config={
+            "content_dir": "src/content/posts",
+            "required_frontmatter_fields": ["title", "published"],
+            "image_mode": "external",
+            "article_format": "md",
+        },
+    )
+    service.search_service = EmptySearchService()
+
+    draft = asyncio.run(service.generate_daily_draft(report_date=date(2026, 5, 19)))
+
+    assert draft.slug == "ai-daily-2026-05-19"
+    assert draft.title.startswith("AI 日报-日期：2026-05-19")
+    assert "暂未获取到足够新闻源" in draft.body
+    assert draft.frontmatter["image"].startswith("https://image.pollinations.ai/prompt/")
+
+
+def test_blog_service_generates_daily_overview_when_search_fails():
+    service = BlogService(
+        context=None,
+        config={
+            "content_dir": "src/content/posts",
+            "required_frontmatter_fields": ["title", "published"],
+            "image_mode": "external",
+            "article_format": "md",
+        },
+    )
+    service.search_service = FailingSearchService()
+
+    draft = asyncio.run(service.generate_daily_draft(report_date=date(2026, 5, 19)))
+
+    assert draft.slug == "ai-daily-2026-05-19"
+    assert "暂未获取到足够新闻源" in draft.body

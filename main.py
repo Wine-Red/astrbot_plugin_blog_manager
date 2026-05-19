@@ -246,7 +246,7 @@ class BlogManagerPlugin(Star):
         event: AstrMessageEvent,
         instructions: str = "",
     ) -> str:
-        """搜索今日 AI 新闻，生成并发布 AI 日报。
+        """搜索今日 AI 新闻，生成并发布 AI 日报；搜索不足时仍由本工具生成日报概览。
 
         Args:
             instructions(string): 额外日报写作要求

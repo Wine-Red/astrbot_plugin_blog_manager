@@ -5,7 +5,9 @@ from __future__ import annotations
 import html
 import re
 from typing import Any
-from urllib.parse import quote_plus, urlparse
+from urllib.parse import parse_qs, quote_plus, unquote, urlparse
+
+import httpx
 
 from ..exceptions import SearchDisabledError
 from ..models import NewsItem
@@ -45,6 +47,8 @@ class SearchService:
         seen_urls: set[str] = set()
         for query in queries:
             query_items = await self._search_with_context(query)
+            if not query_items:
+                query_items = await self._search_with_duckduckgo(query)
             for item in query_items:
                 url = item.url.strip()
                 if not url or url in seen_urls:
@@ -84,6 +88,24 @@ class SearchService:
                     return parsed
         return []
 
+    async def _search_with_duckduckgo(self, query: str) -> list[NewsItem]:
+        """Fallback to DuckDuckGo HTML results when AstrBot context search is absent."""
+
+        url = f"https://duckduckgo.com/html/?q={quote_plus(query)}"
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (compatible; AstrBotBlogManager/1.0; "
+                "+https://duckduckgo.com/)"
+            )
+        }
+        try:
+            async with httpx.AsyncClient(timeout=12.0, headers=headers, follow_redirects=True) as client:
+                response = await client.get(url)
+                response.raise_for_status()
+        except httpx.HTTPError:
+            return []
+        return self._parse_duckduckgo_html(response.text)
+
     def _parse_context_results(self, raw_results: Any) -> list[NewsItem]:
         if isinstance(raw_results, dict):
             raw_results = raw_results.get("results") or raw_results.get("items") or []
@@ -115,6 +137,61 @@ class SearchService:
                     )
                 )
         return items
+
+    def _parse_duckduckgo_html(self, text: str) -> list[NewsItem]:
+        links = list(
+            re.finditer(
+                r'<a[^>]+class="[^"]*\bresult__a\b[^"]*"[^>]+href="([^"]+)"[^>]*>(.*?)</a>',
+                text,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+        )
+        snippets = [
+            _strip_html(match.group(1))
+            for match in re.finditer(
+                r'<a[^>]+class="[^"]*\bresult__snippet\b[^"]*"[^>]*>(.*?)</a>',
+                text,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+        ]
+        snippets.extend(
+            _strip_html(match.group(1))
+            for match in re.finditer(
+                r'<div[^>]+class="[^"]*\bresult__snippet\b[^"]*"[^>]*>(.*?)</div>',
+                text,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+        )
+
+        items: list[NewsItem] = []
+        seen_urls: set[str] = set()
+        for index, match in enumerate(links):
+            title = _strip_html(match.group(2))
+            url = self._normalize_duckduckgo_url(html.unescape(match.group(1)))
+            if not title or not url or url in seen_urls:
+                continue
+            seen_urls.add(url)
+            summary = snippets[index] if index < len(snippets) else title
+            items.append(
+                NewsItem(
+                    title=title,
+                    summary=summary or title,
+                    url=url,
+                    source=self._source_from_url(url) or "DuckDuckGo",
+                )
+            )
+        return items
+
+    def _normalize_duckduckgo_url(self, url: str) -> str:
+        parsed = urlparse(url)
+        query = parse_qs(parsed.query)
+        if "uddg" in query and query["uddg"]:
+            return unquote(query["uddg"][0])
+        if url.startswith("//"):
+            return "https:" + url
+        if parsed.scheme and parsed.netloc:
+            return url
+        return ""
 
     def _source_from_url(self, url: str) -> str:
         hostname = urlparse(url).netloc.lower()
