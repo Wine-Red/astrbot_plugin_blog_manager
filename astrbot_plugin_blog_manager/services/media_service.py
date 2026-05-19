@@ -44,6 +44,8 @@ class MediaService:
                 )
             )
             draft.body = draft.body.replace(prepared.source_url, "/" + prepared.repo_path)
+            if draft.frontmatter.get("image") == prepared.source_url:
+                draft.frontmatter["image"] = "/" + prepared.repo_path
             if draft.rendered_content:
                 draft.rendered_content = draft.rendered_content.replace(
                     prepared.source_url, "/" + prepared.repo_path

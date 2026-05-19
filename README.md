@@ -6,14 +6,12 @@
 
 - 通过 `/blog draft <主题>` 生成 Astro 兼容文章草稿
 - 通过 `/blog publish <主题>` 生成并发布文章到 GitHub
-- 通过 `/blog daily [额外要求]` 自动搜索 AI 新闻并发布 AI 日报
 - 通过 `/blog close <PR编号>` 关闭未合并 PR 并尝试删除工作分支
 - 通过 `/blog check <Markdown>` 做 Astro 预校验
 - 通过 `/blog config-check` 检查关键配置
 - 支持 AstrBot LLM Tool：
   - `draft_blog_article`
   - `publish_blog_article`
-  - `publish_ai_daily_report`
 - 支持两种仓库写入模式：
   - `pr`
   - `direct`
@@ -24,7 +22,6 @@
 ## 首期限界
 
 - 首期聚焦“发文闭环”，不是完整的通用仓库管理平台
-- 搜索增强与定时日报已预留接口，但尚未实现完整调度闭环
 - 当前对 “符合 Astro 校验机制” 的实现方式是插件侧严格预校验
 - 若你提供具体博客仓库结构，可继续扩展为真实 schema 校验模式
 
@@ -60,8 +57,7 @@
 
 ```text
 /blog draft 写一篇关于 Astro Content Collections 的实践文章
-/blog publish 生成一篇 AI 日报风格的 Astro 文章，强调结构化与可读性
-/blog daily 重点关注大模型、Agent 和多模态应用
+/blog publish 生成一篇关于大模型 Agent 产品的 Astro 文章，要求 AstrBot 自行搜索并附上新闻来源
 /blog close 12
 /blog check ---
 title: Demo
@@ -86,26 +82,7 @@ Hello Astro
 
 - `draft_blog_article`
 - `publish_blog_article`
-- `publish_ai_daily_report`
 - `close_blog_pull_request`
-
-## AI 日报
-
-`/blog daily` 会执行以下流程：
-
-- 使用 AstrBot 自带搜索能力抓取今日 AI 新闻
-- 默认搜索更偏向前沿大模型、产品发布、Agent、多模态、开源模型和 API 动态，弱化就业等泛社会议题
-- 搜索不足 3 条新闻时仍会由日报工具生成 AI 日报概览，不会退回普通写文章工具
-- 优先调用 AstrBot Context 生图能力；若不可用，会生成 Pollinations 封面图 URL
-- 正文会插入封面图，并为重点新闻生成统一风格的新闻配图
-- 使用 Firefly frontmatter：
-  - `title`: `AI 日报-日期：<日期>：<主标题>`
-  - `description`: `今日 AI 核心速览：<一句话总结>`
-  - `tags`: `["AI", "日报", "人工智能", "<当天核心技术词>"]`
-  - `category`: `AI资讯`
-  - `image`: 封面图 URL
-
-日报 slug 固定为 `ai-daily-YYYY-MM-DD`，保持 ASCII kebab-case，不允许中文 slug。
 
 ## Astro 适配说明
 
@@ -131,7 +108,6 @@ Hello Astro
 - 未接入真实 Astro 仓库时，无法 100% 复刻目标站点的自定义 schema
 - LLM Tool 能力依赖当前会话模型支持函数调用
 - `download` 图片模式需要远程图片可访问
-- 定时日报与搜索增强目前仅为扩展点
 
 ## 开发
 

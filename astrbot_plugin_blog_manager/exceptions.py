@@ -33,10 +33,3 @@ class GitHubClientError(BlogManagerError):
 class MediaDownloadError(BlogManagerError):
     """Raised when remote media cannot be downloaded or normalized."""
 
-
-class SearchDisabledError(BlogManagerError):
-    """Raised when a search request is attempted while the feature is disabled."""
-
-
-class TaskFeatureDisabledError(BlogManagerError):
-    """Raised when schedule operations are not enabled."""

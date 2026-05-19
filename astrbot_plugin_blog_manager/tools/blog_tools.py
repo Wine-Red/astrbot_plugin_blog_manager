@@ -102,7 +102,6 @@ def format_help_text() -> str:
             "用法:",
             "/blog publish <主题或要求>",
             "/blog draft <主题或要求>",
-            "/blog daily [额外要求]",
             "/blog list [数量]",
             "/blog update <slug或完整路径> <更新要求>",
             "/blog merge <PR编号> [merge|squash|rebase]",

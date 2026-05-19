@@ -23,9 +23,9 @@ DEFAULT_FRONTMATTER_TEMPLATE = {
     "image": "",
 }
 DEFAULT_AGENT_SYSTEM_PROMPT = (
-    "你是一个 Astro 博客写作助手。你必须生成结构完整、内容丰富、适合直接发布到 Astro "
-    "博客仓库的文章。输出内容要准确、自然、避免空泛，frontmatter 必须与正文一致，"
-    "并主动补全合适的分类、标签、摘要和可发布的文章结构。"
+    "你是一个严谨的 Astro 博客编辑和技术写作者。你必须生成结构完整、信息密度高、"
+    "适合直接发布到 Astro 博客仓库的文章。输出内容要准确、自然、具体，避免空泛套话，"
+    "frontmatter 必须与正文一致，并主动补全合适的分类、标签、摘要和可发布的文章结构。"
 )
 FIREFLY_FRONTMATTER_TEMPLATE_TEXT = """---
 title: "你的文章标题"

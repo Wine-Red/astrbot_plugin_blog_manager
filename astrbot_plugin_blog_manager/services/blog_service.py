@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import date
 from typing import Any, Mapping
 
 from ..adapters.astro_adapter import AstroAdapter
@@ -18,9 +17,7 @@ from ..models import (
     ArticleSummary,
     AstroArticleDraft,
     BlogGenerateRequest,
-    DailyReportRequest,
     DeleteResult,
-    NewsItem,
     PublishResult,
     PullRequestCloseResult,
     PullRequestMergeResult,
@@ -30,11 +27,6 @@ from ..utils.markdown import parse_frontmatter, render_markdown_document
 from ..validators.astro_validator import AstroValidator
 from .agent_service import AgentService
 from .publish_service import PublishService
-from .search_service import (
-    DEFAULT_AI_NEWS_QUERIES,
-    SearchService,
-    parse_news_items_from_text,
-)
 
 
 class BlogService:
@@ -45,8 +37,6 @@ class BlogService:
         self.config = config
         self.agent_service = AgentService(context, config)
         self.publish_service = PublishService(config)
-        self.search_service = SearchService(bool(config.get("search_enabled", True)))
-        self.search_service.context = context
         self.adapter = AstroAdapter(config)
         self.validator = AstroValidator(config)
 
@@ -108,59 +98,6 @@ class BlogService:
         self._ensure_github_ready()
         draft = await self.generate_draft(request, event=event)
         return await self.publish_service.publish(request, draft)
-
-    async def generate_daily_draft(
-        self,
-        *,
-        event: Any | None = None,
-        extra_instructions: str = "",
-        report_date: date | None = None,
-    ) -> AstroArticleDraft:
-        news_items = await self._collect_daily_news(extra_instructions)
-        request = DailyReportRequest(
-            report_date=report_date or date.today(),
-            extra_instructions=extra_instructions,
-            immediate_publish=False,
-        )
-        cover_headline = news_items[0].title if news_items else "今日 AI 行业概览"
-        cover_image_url = await self.agent_service.generate_cover_image(
-            cover_headline,
-            event=event,
-        )
-        draft = await self.agent_service.generate_daily_report(
-            request,
-            news_items,
-            event=event,
-            cover_image_url=cover_image_url,
-        )
-        draft.article_path = self.adapter.build_article_path(draft)
-        draft.frontmatter = build_frontmatter(self.config, BlogGenerateRequest(topic=draft.title), draft)
-        draft.rendered_content = render_markdown_document(draft.frontmatter, draft.body)
-        self._ensure_valid(draft)
-        return draft
-
-    async def publish_daily_report(
-        self,
-        *,
-        event: Any | None = None,
-        extra_instructions: str = "",
-        report_date: date | None = None,
-    ) -> PublishResult:
-        self._ensure_github_ready()
-        draft = await self.generate_daily_draft(
-            event=event,
-            extra_instructions=extra_instructions,
-            report_date=report_date,
-        )
-        return await self.publish_service.publish(
-            BlogGenerateRequest(
-                topic=draft.title,
-                instructions=extra_instructions,
-                immediate_publish=True,
-                image_preference="external",
-            ),
-            draft,
-        )
 
     async def list_articles(self, *, limit: int = 10) -> list[ArticleSummary]:
         self._ensure_github_ready()
@@ -258,28 +195,6 @@ class BlogService:
         for key in ("github_token", "github_owner", "github_repo"):
             if not str(self.config.get(key, "")).strip():
                 raise PluginConfigError(f"缺少 GitHub 配置项: {key}")
-
-    async def _collect_daily_news(self, extra_instructions: str = "") -> list[NewsItem]:
-        supplied_items = parse_news_items_from_text(extra_instructions)
-        try:
-            news_items = await self.search_service.search_news(DEFAULT_AI_NEWS_QUERIES, limit=8)
-        except Exception:
-            news_items = []
-        news_items = self._merge_news_items([*supplied_items, *news_items], limit=5)
-        return news_items
-
-    def _merge_news_items(self, items: list[NewsItem], *, limit: int) -> list[NewsItem]:
-        merged: list[NewsItem] = []
-        seen: set[str] = set()
-        for item in items:
-            key = item.url.strip() or item.title.strip().lower()
-            if not key or key in seen:
-                continue
-            seen.add(key)
-            merged.append(item)
-            if len(merged) >= limit:
-                break
-        return merged
 
     def _option_check_lines(self, options: Mapping[str, set[str]]) -> list[str]:
         lines: list[str] = []

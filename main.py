@@ -19,7 +19,6 @@ if str(PLUGIN_ROOT) not in sys.path:
 for module_name in (
     "astrbot_plugin_blog_manager.models",
     "astrbot_plugin_blog_manager.clients.github_client",
-    "astrbot_plugin_blog_manager.services.search_service",
     "astrbot_plugin_blog_manager.services.agent_service",
     "astrbot_plugin_blog_manager.services.repository_service",
     "astrbot_plugin_blog_manager.services.publish_service",
@@ -33,7 +32,6 @@ from astrbot_plugin_blog_manager.constants import PLUGIN_NAME
 from astrbot_plugin_blog_manager.exceptions import BlogManagerError
 from astrbot_plugin_blog_manager.models import BlogGenerateRequest
 from astrbot_plugin_blog_manager.services.blog_service import BlogService
-from astrbot_plugin_blog_manager.services.task_service import TaskService
 from astrbot_plugin_blog_manager.tools.blog_tools import (
     build_request_from_payload,
     format_close_summary,
@@ -62,9 +60,6 @@ class BlogManagerPlugin(Star):
         super().__init__(context)
         self.config = config or {}
         self.blog_service = BlogService(context, self.config)
-        self.task_service = TaskService(
-            bool(self.config.get("schedule_feature_enabled", False))
-        )
 
     async def initialize(self):
         """Initialize the plugin instance."""
@@ -73,7 +68,7 @@ class BlogManagerPlugin(Star):
 
     @filter.command("blog")
     async def blog(self, event: AstrMessageEvent):
-        """管理 Astro 博客。支持 publish、draft、daily、list、update、merge、close、delete、check、config-check。"""
+        """管理 Astro 博客。支持 publish、draft、list、update、merge、close、delete、check、config-check。"""
 
         subcommand, payload = parse_blog_command(event.message_str)
         try:
@@ -95,13 +90,6 @@ class BlogManagerPlugin(Star):
                 request = build_request_from_payload(topic=payload or "未命名文章")
                 draft = await self.blog_service.generate_draft(request, event=event)
                 yield event.plain_result(format_draft_summary(draft))
-                return
-            if subcommand == "daily":
-                result = await self.blog_service.publish_daily_report(
-                    event=event,
-                    extra_instructions=payload,
-                )
-                yield event.plain_result(format_publish_summary(result))
                 return
             if subcommand == "list":
                 limit = 10
@@ -239,30 +227,6 @@ class BlogManagerPlugin(Star):
             return format_publish_summary(result)
         except BlogManagerError as exc:
             return f"发布失败: {exc}"
-
-    @filter.llm_tool(name="publish_ai_daily_report")
-    async def publish_ai_daily_report(
-        self,
-        event: AstrMessageEvent,
-        instructions: str = "",
-    ) -> str:
-        """搜索今日 AI 新闻，生成并发布 AI 日报；搜索不足时仍由本工具生成日报概览。
-
-        Args:
-            instructions(string): 额外日报写作要求
-        """
-
-        if not self.config.get("allow_auto_publish", True):
-            return "当前配置未允许通过自然语言工具直接发布。"
-
-        try:
-            result = await self.blog_service.publish_daily_report(
-                event=event,
-                extra_instructions=extract_tool_string(instructions),
-            )
-            return format_publish_summary(result)
-        except BlogManagerError as exc:
-            return f"AI 日报发布失败: {exc}"
 
     @filter.llm_tool(name="list_blog_articles")
     async def list_blog_articles(
