@@ -180,6 +180,32 @@ class PullRequestMergeResult:
 
 
 @dataclass(slots=True)
+class PullRequestCloseResult:
+    """Outcome of closing a GitHub pull request."""
+
+    number: int
+    title: str
+    state: str
+    url: str = ""
+    deleted_branch: str = ""
+    warnings: list[str] = field(default_factory=list)
+
+    def to_lines(self) -> list[str]:
+        lines = [
+            f"PR 编号: {self.number}",
+            f"标题: {self.title}",
+            f"状态: {self.state}",
+        ]
+        if self.deleted_branch:
+            lines.append(f"已删除分支: {self.deleted_branch}")
+        if self.url:
+            lines.append(f"PR: {self.url}")
+        if self.warnings:
+            lines.append("警告: " + "；".join(self.warnings))
+        return lines
+
+
+@dataclass(slots=True)
 class DeleteResult:
     """Outcome of deleting an article from GitHub."""
 

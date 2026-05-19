@@ -9,7 +9,7 @@ from typing import Any
 import httpx
 
 from ..exceptions import GitHubClientError
-from ..models import PullRequestInfo, PullRequestMergeResult
+from ..models import PullRequestCloseResult, PullRequestInfo, PullRequestMergeResult
 
 
 class GitHubClient:
@@ -76,6 +76,11 @@ class GitHubClient:
                     f"无法合并 PR #{kwargs_pr_hint(operation)}。"
                     "请检查 PR 是否存在、是否已关闭，或当前 Token 是否有合并权限。"
                 )
+            elif operation.startswith("close_pull_request:"):
+                message = (
+                    f"无法关闭 PR #{kwargs_pr_hint(operation)}。"
+                    "请检查 PR 是否存在，或该 PR 是否属于当前仓库。"
+                )
             elif operation.startswith("delete_branch:"):
                 message = (
                     f"找不到分支 `{kwargs_branch_hint(operation, prefix='delete_branch:')}`。"
@@ -89,6 +94,11 @@ class GitHubClient:
                     f"合并 PR 权限不足（{response.status_code}）。"
                     "请确认 github_token 具有 Pull requests 写权限，"
                     "并且当前账号对目标仓库拥有合并权限。"
+                )
+            elif operation.startswith("close_pull_request:"):
+                message = (
+                    f"关闭 PR 权限不足（{response.status_code}）。"
+                    "请确认 github_token 具有 Pull requests 写权限。"
                 )
             elif operation.startswith("delete_branch:"):
                 message = (
@@ -279,6 +289,44 @@ class GitHubClient:
             merged=bool(data.get("merged", False)),
             sha=str(data.get("sha", "")),
             method=method,
+            url=pr_info.url,
+            deleted_branch=deleted_branch,
+            warnings=warnings,
+        )
+
+    async def close_pull_request(self, *, number: int) -> PullRequestCloseResult:
+        pr_info = await self.get_pull_request(number)
+        if pr_info.merged:
+            return PullRequestCloseResult(
+                number=number,
+                title=pr_info.title,
+                state="已合并，无法取消",
+                url=pr_info.url,
+                warnings=["PR 已经合并，不能通过关闭 PR 撤销已进入目标分支的提交。"],
+            )
+
+        data = await self._request(
+            "PATCH",
+            f"{self.repo_api}/pulls/{number}",
+            json={"state": "closed"},
+            operation=f"close_pull_request:{number}",
+        )
+
+        deleted_branch = ""
+        warnings: list[str] = []
+        if pr_info.head and pr_info.head != pr_info.base:
+            try:
+                await self.delete_branch(pr_info.head)
+                deleted_branch = pr_info.head
+            except GitHubClientError as exc:
+                warnings.append(f"自动删除分支失败：{exc}")
+        else:
+            warnings.append("未删除分支：PR head 为空或与 base 分支相同。")
+
+        return PullRequestCloseResult(
+            number=number,
+            title=pr_info.title,
+            state=str(data.get("state", "closed")),
             url=pr_info.url,
             deleted_branch=deleted_branch,
             warnings=warnings,

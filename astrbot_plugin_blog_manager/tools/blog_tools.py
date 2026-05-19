@@ -10,6 +10,7 @@ from ..models import (
     BlogGenerateRequest,
     DeleteResult,
     PublishResult,
+    PullRequestCloseResult,
     PullRequestMergeResult,
 )
 
@@ -71,6 +72,12 @@ def format_merge_summary(result: PullRequestMergeResult) -> str:
     return "PR 合并完成。\n" + "\n".join(result.to_lines())
 
 
+def format_close_summary(result: PullRequestCloseResult) -> str:
+    """Return a compact close summary for QQ replies."""
+
+    return "PR 已关闭。\n" + "\n".join(result.to_lines())
+
+
 def format_delete_summary(result: DeleteResult) -> str:
     """Return a compact delete summary for QQ replies."""
 
@@ -99,6 +106,7 @@ def format_help_text() -> str:
             "/blog list [数量]",
             "/blog update <slug或完整路径> <更新要求>",
             "/blog merge <PR编号> [merge|squash|rebase]",
+            "/blog close <PR编号>",
             "/blog delete <slug或完整路径>",
             "/blog check <Markdown 草稿>",
             "/blog config-check",

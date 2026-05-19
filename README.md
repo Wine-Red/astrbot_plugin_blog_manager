@@ -7,6 +7,7 @@
 - 通过 `/blog draft <主题>` 生成 Astro 兼容文章草稿
 - 通过 `/blog publish <主题>` 生成并发布文章到 GitHub
 - 通过 `/blog daily [额外要求]` 自动搜索 AI 新闻并发布 AI 日报
+- 通过 `/blog close <PR编号>` 关闭未合并 PR 并尝试删除工作分支
 - 通过 `/blog check <Markdown>` 做 Astro 预校验
 - 通过 `/blog config-check` 检查关键配置
 - 支持 AstrBot LLM Tool：
@@ -61,6 +62,7 @@
 /blog draft 写一篇关于 Astro Content Collections 的实践文章
 /blog publish 生成一篇 AI 日报风格的 Astro 文章，强调结构化与可读性
 /blog daily 重点关注大模型、Agent 和多模态应用
+/blog close 12
 /blog check ---
 title: Demo
 description: Demo
@@ -85,6 +87,7 @@ Hello Astro
 - `draft_blog_article`
 - `publish_blog_article`
 - `publish_ai_daily_report`
+- `close_blog_pull_request`
 
 ## AI 日报
 

@@ -19,6 +19,7 @@ from ..models import (
     ArticleSummary,
     DeleteResult,
     PublishResult,
+    PullRequestCloseResult,
     PullRequestInfo,
     PullRequestMergeResult,
     RepoFileChange,
@@ -140,6 +141,9 @@ class RepositoryService:
         method: str = "squash",
     ) -> PullRequestMergeResult:
         return await self.client.merge_pull_request(number=number, method=method)
+
+    async def close_pull_request(self, *, number: int) -> PullRequestCloseResult:
+        return await self.client.close_pull_request(number=number)
 
     async def list_articles(self, *, limit: int = 10) -> list[ArticleSummary]:
         default_branch = self._default_branch()

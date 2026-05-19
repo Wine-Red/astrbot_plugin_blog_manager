@@ -14,6 +14,7 @@ from ..models import (
     BlogGenerateRequest,
     DeleteResult,
     PublishResult,
+    PullRequestCloseResult,
     PullRequestMergeResult,
 )
 from ..utils.markdown import render_markdown_document
@@ -78,6 +79,14 @@ class PublishService:
         )
         repository_service = RepositoryService(client, self.config)
         return await repository_service.merge_pull_request(number=pr_number, method=method)
+
+    async def close_pull_request(self, *, pr_number: int) -> PullRequestCloseResult:
+        client = self._build_client()
+        await client.verify_repository_access(
+            str(self.config.get("default_branch", "main")).strip() or "main"
+        )
+        repository_service = RepositoryService(client, self.config)
+        return await repository_service.close_pull_request(number=pr_number)
 
     async def delete_article(self, *, target: str) -> DeleteResult:
         client = self._build_client()

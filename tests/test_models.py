@@ -1,4 +1,9 @@
-from astrbot_plugin_blog_manager.models import DeleteResult, PullRequestMergeResult, PublishResult
+from astrbot_plugin_blog_manager.models import (
+    DeleteResult,
+    PullRequestCloseResult,
+    PullRequestMergeResult,
+    PublishResult,
+)
 
 
 def test_publish_result_includes_pr_number():
@@ -51,3 +56,18 @@ def test_delete_result_to_lines():
 
     assert any("目标: welcome-to-my-blog" == line for line in lines)
     assert any("PR 编号: 18" == line for line in lines)
+
+
+def test_pull_request_close_result_to_lines():
+    result = PullRequestCloseResult(
+        number=12,
+        title="Publish blog article: 示例文章",
+        state="closed",
+        url="https://github.com/example/repo/pull/12",
+        deleted_branch="astrbot/blog/demo-20260519120000",
+    )
+
+    lines = result.to_lines()
+
+    assert any("状态: closed" == line for line in lines)
+    assert any("已删除分支: astrbot/blog/demo-20260519120000" == line for line in lines)

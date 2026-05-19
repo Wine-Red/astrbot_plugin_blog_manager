@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import sys
 from pathlib import Path
 
@@ -13,6 +14,21 @@ PLUGIN_ROOT = Path(__file__).resolve().parent
 if str(PLUGIN_ROOT) not in sys.path:
     sys.path.insert(0, str(PLUGIN_ROOT))
 
+# AstrBot 的插件重载可能只重新执行 main.py，但保留业务子模块缓存。
+# 主动刷新本插件子模块，避免入口调用到旧版 BlogService/AgentService。
+for module_name in (
+    "astrbot_plugin_blog_manager.models",
+    "astrbot_plugin_blog_manager.clients.github_client",
+    "astrbot_plugin_blog_manager.services.search_service",
+    "astrbot_plugin_blog_manager.services.agent_service",
+    "astrbot_plugin_blog_manager.services.repository_service",
+    "astrbot_plugin_blog_manager.services.publish_service",
+    "astrbot_plugin_blog_manager.services.blog_service",
+    "astrbot_plugin_blog_manager.tools.blog_tools",
+):
+    if module_name in sys.modules:
+        importlib.reload(sys.modules[module_name])
+
 from astrbot_plugin_blog_manager.constants import PLUGIN_NAME
 from astrbot_plugin_blog_manager.exceptions import BlogManagerError
 from astrbot_plugin_blog_manager.models import BlogGenerateRequest
@@ -20,6 +36,7 @@ from astrbot_plugin_blog_manager.services.blog_service import BlogService
 from astrbot_plugin_blog_manager.services.task_service import TaskService
 from astrbot_plugin_blog_manager.tools.blog_tools import (
     build_request_from_payload,
+    format_close_summary,
     format_delete_summary,
     extract_tool_string,
     format_draft_summary,
@@ -56,7 +73,7 @@ class BlogManagerPlugin(Star):
 
     @filter.command("blog")
     async def blog(self, event: AstrMessageEvent):
-        """管理 Astro 博客。支持 publish、draft、daily、list、update、merge、delete、check、config-check。"""
+        """管理 Astro 博客。支持 publish、draft、daily、list、update、merge、close、delete、check、config-check。"""
 
         subcommand, payload = parse_blog_command(event.message_str)
         try:
@@ -128,6 +145,18 @@ class BlogManagerPlugin(Star):
                     method=merge_method,
                 )
                 yield event.plain_result(format_merge_summary(result))
+                return
+            if subcommand in ("close", "cancel"):
+                if not payload:
+                    yield event.plain_result("请提供 PR 编号，例如 `/blog close 12`。")
+                    return
+                try:
+                    pr_number = int(payload.split()[0])
+                except ValueError:
+                    yield event.plain_result("PR 编号必须是整数，例如 `/blog close 12`。")
+                    return
+                result = await self.blog_service.close_pull_request(pr_number=pr_number)
+                yield event.plain_result(format_close_summary(result))
                 return
             if subcommand == "delete":
                 if not payload:
@@ -299,6 +328,24 @@ class BlogManagerPlugin(Star):
             return format_merge_summary(result)
         except BlogManagerError as exc:
             return f"PR 合并失败: {exc}"
+
+    @filter.llm_tool(name="close_blog_pull_request")
+    async def close_blog_pull_request(
+        self,
+        event: AstrMessageEvent,
+        pr_number: int,
+    ) -> str:
+        """关闭博客仓库中的 Pull Request，并尝试删除其工作分支。
+
+        Args:
+            pr_number(number): 要关闭的 PR 编号
+        """
+
+        try:
+            result = await self.blog_service.close_pull_request(pr_number=int(pr_number))
+            return format_close_summary(result)
+        except BlogManagerError as exc:
+            return f"PR 关闭失败: {exc}"
 
     @filter.llm_tool(name="delete_blog_article")
     async def delete_blog_article(

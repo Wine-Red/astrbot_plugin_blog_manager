@@ -22,6 +22,7 @@ from ..models import (
     DeleteResult,
     NewsItem,
     PublishResult,
+    PullRequestCloseResult,
     PullRequestMergeResult,
 )
 from ..utils.datetime_utils import frontmatter_date
@@ -171,6 +172,10 @@ class BlogService:
             pr_number=pr_number,
             method=method,
         )
+
+    async def close_pull_request(self, *, pr_number: int) -> PullRequestCloseResult:
+        self._ensure_github_ready()
+        return await self.publish_service.close_pull_request(pr_number=pr_number)
 
     async def delete_article(self, *, target: str) -> DeleteResult:
         self._ensure_github_ready()
