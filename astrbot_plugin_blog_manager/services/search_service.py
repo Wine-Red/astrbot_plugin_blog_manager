@@ -7,8 +7,6 @@ import re
 from typing import Any
 from urllib.parse import parse_qs, quote_plus, unquote, urlparse
 
-import httpx
-
 from ..exceptions import SearchDisabledError
 from ..models import NewsItem
 
@@ -107,6 +105,11 @@ class SearchService:
         return items
 
     async def _search_duckduckgo(self, query: str) -> list[NewsItem]:
+        try:
+            import httpx
+        except ImportError:
+            return []
+
         url = f"https://duckduckgo.com/html/?q={quote_plus(query)}"
         headers = {"User-Agent": "astrbot-plugin-blog-manager/1.0"}
         try:

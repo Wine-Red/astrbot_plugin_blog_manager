@@ -40,10 +40,8 @@ class BlogService:
         self.config = config
         self.agent_service = AgentService(context, config)
         self.publish_service = PublishService(config)
-        self.search_service = SearchService(
-            bool(config.get("search_enabled", True)),
-            context=context,
-        )
+        self.search_service = SearchService(bool(config.get("search_enabled", True)))
+        self.search_service.context = context
         self.adapter = AstroAdapter(config)
         self.validator = AstroValidator(config)
 

@@ -17,7 +17,6 @@ from astrbot_plugin_blog_manager.constants import PLUGIN_NAME
 from astrbot_plugin_blog_manager.exceptions import BlogManagerError
 from astrbot_plugin_blog_manager.models import BlogGenerateRequest
 from astrbot_plugin_blog_manager.services.blog_service import BlogService
-from astrbot_plugin_blog_manager.services.search_service import SearchService
 from astrbot_plugin_blog_manager.services.task_service import TaskService
 from astrbot_plugin_blog_manager.tools.blog_tools import (
     build_request_from_payload,
@@ -46,10 +45,6 @@ class BlogManagerPlugin(Star):
         super().__init__(context)
         self.config = config or {}
         self.blog_service = BlogService(context, self.config)
-        self.search_service = SearchService(
-            bool(self.config.get("search_enabled", True)),
-            context=context,
-        )
         self.task_service = TaskService(
             bool(self.config.get("schedule_feature_enabled", False))
         )
