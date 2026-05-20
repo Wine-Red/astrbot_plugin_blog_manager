@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any, Mapping
+from urllib.parse import urlparse
 
 from ..adapters.astro_adapter import AstroAdapter
 from ..adapters.frontmatter_adapter import build_frontmatter
@@ -21,12 +22,27 @@ from ..models import (
     PublishResult,
     PullRequestCloseResult,
     PullRequestMergeResult,
+    ValidationIssue,
 )
 from ..utils.datetime_utils import frontmatter_date
-from ..utils.markdown import parse_frontmatter, render_markdown_document
+from ..utils.markdown import extract_markdown_links, parse_frontmatter, render_markdown_document
 from ..validators.astro_validator import AstroValidator
 from .agent_service import AgentService
+from .article_pipeline_service import ArticlePipelineService
 from .publish_service import PublishService
+
+
+SUSPICIOUS_SOURCE_DOMAINS = {
+    "example.com",
+    "example.org",
+    "example.net",
+    "localhost",
+    "127.0.0.1",
+    "0.0.0.0",
+    "test.com",
+    "test.org",
+    "invalid.com",
+}
 
 
 class BlogService:
@@ -36,6 +52,7 @@ class BlogService:
         self.context = context
         self.config = config
         self.agent_service = AgentService(context, config)
+        self.pipeline_service = ArticlePipelineService()
         self.publish_service = PublishService(config)
         self.adapter = AstroAdapter(config)
         self.validator = AstroValidator(config)
@@ -86,6 +103,7 @@ class BlogService:
         draft.article_path = self.adapter.build_article_path(draft)
         draft.frontmatter = build_frontmatter(self.config, request, draft)
         draft.rendered_content = render_markdown_document(draft.frontmatter, draft.body)
+        self._run_pipeline(request, draft)
         self._ensure_valid(draft)
         return draft
 
@@ -153,6 +171,7 @@ class BlogService:
             draft.frontmatter = existing_frontmatter
         draft.frontmatter = build_frontmatter(self.config, request, draft)
         draft.rendered_content = render_markdown_document(draft.frontmatter, draft.body)
+        self._run_pipeline(request, draft)
         self._ensure_valid(draft)
         return await self.publish_service.update_article(
             request,
@@ -188,13 +207,54 @@ class BlogService:
 
     def _ensure_valid(self, draft: AstroArticleDraft) -> None:
         validation = self.validator.validate(draft)
-        if not validation.valid:
-            raise AstroValidationError(validation.summary())
+        validation.issues.extend(self._source_link_issues(draft))
+        if validation.issues:
+            raise AstroValidationError(
+                "\n".join(f"- {issue.field}: {issue.message}" for issue in validation.issues)
+            )
+
+    def _run_pipeline(self, request: BlogGenerateRequest, draft: AstroArticleDraft) -> None:
+        result = self.pipeline_service.process(request, draft)
+        draft.warnings.extend(result.warnings)
+        if result.issues:
+            raise AstroValidationError(
+                "\n".join(f"- {issue.field}: {issue.message}" for issue in result.issues)
+            )
 
     def _ensure_github_ready(self) -> None:
         for key in ("github_token", "github_owner", "github_repo"):
             if not str(self.config.get(key, "")).strip():
                 raise PluginConfigError(f"缺少 GitHub 配置项: {key}")
+
+    def _source_link_issues(self, draft: AstroArticleDraft) -> list[ValidationIssue]:
+        issues: list[ValidationIssue] = []
+        for label, url in extract_markdown_links(draft.rendered_content or draft.body):
+            if not self._is_source_like_link(label, url):
+                continue
+            if self._is_suspicious_source_url(url):
+                issues.append(
+                    ValidationIssue(
+                        "source",
+                        f"来源链接疑似占位或伪造，请替换为真实可核验来源: {url}",
+                    )
+                )
+        return issues
+
+    def _is_source_like_link(self, label: str, url: str) -> bool:
+        source_markers = ("来源", "参考", "原文", "官方", "报道", "source", "reference")
+        text = f"{label} {url}".lower()
+        return any(marker in text for marker in source_markers)
+
+    def _is_suspicious_source_url(self, url: str) -> bool:
+        parsed = urlparse(url.strip())
+        if parsed.scheme not in ("http", "https"):
+            return False
+        hostname = parsed.netloc.lower()
+        if hostname.startswith("www."):
+            hostname = hostname[4:]
+        if hostname in SUSPICIOUS_SOURCE_DOMAINS:
+            return True
+        return ".invalid" in hostname or hostname.endswith(".test")
 
     def _option_check_lines(self, options: Mapping[str, set[str]]) -> list[str]:
         lines: list[str] = []

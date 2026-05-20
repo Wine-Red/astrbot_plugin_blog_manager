@@ -53,6 +53,7 @@ class PublishService:
             article_content=draft.rendered_content.encode("utf-8"),
             extra_changes=media_changes,
         )
+        result.warnings.extend(draft.warnings)
         result.warnings.extend(warnings)
         site_base_url = str(self.config.get("site_base_url", "/")).rstrip("/")
         if site_base_url:
@@ -137,6 +138,7 @@ class PublishService:
             article_content=draft.rendered_content.encode("utf-8"),
             extra_changes=media_changes,
         )
+        result.warnings.extend(draft.warnings)
         result.warnings.extend(warnings)
         site_base_url = str(self.config.get("site_base_url", "/")).rstrip("/")
         if site_base_url:

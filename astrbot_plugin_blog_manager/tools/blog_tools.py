@@ -57,6 +57,8 @@ def format_draft_summary(draft: AstroArticleDraft) -> str:
     ]
     if draft.images:
         lines.append(f"图片数量: {len(draft.images)}")
+    if draft.warnings:
+        lines.append("质量提示: " + "；".join(draft.warnings))
     return "\n".join(lines)
 
 

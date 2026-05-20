@@ -19,6 +19,70 @@ class BlogGenerateRequest:
 
 
 @dataclass(slots=True)
+class ArticleRequestSpec:
+    """Structured writing contract inferred from a user request."""
+
+    topic: str
+    article_type: str = "deep_analysis"
+    audience: str = "通用读者"
+    depth: str = "standard"
+    must_include: list[str] = field(default_factory=list)
+    must_exclude: list[str] = field(default_factory=list)
+    source_policy: str = "optional"
+    image_policy: str = "optional"
+    series_id: str = ""
+
+
+@dataclass(slots=True)
+class SourceRecord:
+    """A normalized source available to the article pipeline."""
+
+    title: str
+    url: str
+    domain: str
+    source_type: str = "web"
+    reliability: int = 50
+    relevance: int = 50
+    accepted: bool = True
+    reject_reason: str = ""
+
+
+@dataclass(slots=True)
+class EvidenceItem:
+    """A source-backed claim or summary used by generated content."""
+
+    claim: str
+    source_url: str
+    source_title: str
+    quote_or_summary: str = ""
+    confidence: str = "medium"
+
+
+@dataclass(slots=True)
+class ImageCandidate:
+    """A normalized image candidate referenced by the article."""
+
+    url: str
+    alt: str
+    source_url: str = ""
+    image_type: str = "section"
+    reliability: int = 50
+    license_note: str = ""
+
+
+@dataclass(slots=True)
+class ArticlePipelineResult:
+    """Result of deterministic article pipeline checks."""
+
+    request_spec: ArticleRequestSpec
+    sources: list[SourceRecord] = field(default_factory=list)
+    evidence: list[EvidenceItem] = field(default_factory=list)
+    images: list[ImageCandidate] = field(default_factory=list)
+    issues: list["ValidationIssue"] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
 class ImageAsset:
     """Represents an image referenced or uploaded by the draft."""
 
@@ -41,6 +105,7 @@ class AstroArticleDraft:
     frontmatter: dict[str, Any] = field(default_factory=dict)
     tags: list[str] = field(default_factory=list)
     images: list[ImageAsset] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
     article_path: str = ""
     rendered_content: str = ""
 
@@ -218,4 +283,3 @@ class ArticleSummary:
 
     def to_line(self) -> str:
         return f"- {self.title} | {self.slug} | {self.path}"
-

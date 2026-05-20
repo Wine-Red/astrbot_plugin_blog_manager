@@ -41,6 +41,22 @@ def extract_image_urls(markdown_text: str) -> list[str]:
     return re.findall(r"!\[[^\]]*\]\(([^)]+)\)", markdown_text)
 
 
+def extract_markdown_links(markdown_text: str) -> list[tuple[str, str]]:
+    """Extract non-image Markdown links as ``(label, url)`` tuples."""
+
+    matches = re.finditer(r"(?<!!)\[([^\]]+)\]\(([^)]+)\)", markdown_text)
+    return [(match.group(1).strip(), match.group(2).strip()) for match in matches]
+
+
+def extract_urls(markdown_text: str) -> list[str]:
+    """Extract bare HTTP(S) URLs from Markdown text."""
+
+    return [
+        match.group(0).rstrip(".,;，。；)")
+        for match in re.finditer(r"https?://[^\s<>\]]+", markdown_text)
+    ]
+
+
 def append_image_gallery(body: str, images: Iterable[tuple[str, str]]) -> str:
     """Append images to the article body using Markdown syntax."""
 

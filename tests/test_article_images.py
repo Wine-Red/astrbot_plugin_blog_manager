@@ -16,9 +16,10 @@ def test_agent_service_prompt_includes_image_requirements():
 
     assert "图片要求" in prompt
     assert "图片偏好：external" in prompt
-    assert "`image` 用作文章封面" in prompt
+    assert "图片是本次交付的一部分" in prompt
+    assert "默认必须给出 1 张" in prompt
     assert "`images` 用作正文配图素材" in prompt
-    assert "不要编造看似真实但无法访问的图片 URL" in prompt
+    assert "未找到可靠公开图片来源" in prompt
 
 
 def test_agent_service_uses_first_image_as_cover_when_cover_missing():
