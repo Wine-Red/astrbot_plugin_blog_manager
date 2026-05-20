@@ -19,13 +19,27 @@ class MediaService:
         self.adapter = AstroAdapter(config)
 
     async def prepare_assets(self, draft: AstroArticleDraft) -> tuple[AstroArticleDraft, list[RepoFileChange], list[str]]:
+        changes: list[RepoFileChange] = []
+        prepared_paths: set[str] = set()
+        for asset in draft.images:
+            if asset.data and asset.repo_path:
+                changes.append(
+                    RepoFileChange(
+                        path=asset.repo_path,
+                        content=asset.data,
+                        message=f"Add blog asset: {asset.repo_path}",
+                    )
+                )
+                prepared_paths.add(asset.repo_path)
+
         image_mode = str(self.config.get("image_mode", "external"))
         if image_mode != "download":
-            return draft, [], []
+            return draft, changes, []
 
         warnings: list[str] = []
-        changes: list[RepoFileChange] = []
         for asset in draft.images:
+            if asset.repo_path in prepared_paths:
+                continue
             if not asset.source_url.startswith("http"):
                 warnings.append(f"跳过非远程图片: {asset.source_url}")
                 continue

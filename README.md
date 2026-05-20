@@ -118,6 +118,21 @@ Hello Astro
 
 对于新闻、产品、模型、版本、价格、榜单等易变化主题，流水线会要求提供用户输入或工具确认的可核验来源链接；缺少来源时不会发布。
 
+## Gitee 文生图封面
+
+如果希望稳定获得封面图，可以启用 Gitee AI 文生图。插件会用图像生成接口生成封面，写入仓库的 `asset_dir`，并把 frontmatter `image` 指向本地资源路径；正文配图仍然可以使用 LLM 提供的可靠外链图。
+
+需要配置：
+
+- `cover_image_provider`: `gitee`
+- `gitee_image_api_key`: Gitee AI API Key
+- `gitee_image_base_url`: 默认 `https://ai.gitee.com/v1`
+- `gitee_image_model`: Gitee AI 控制台中可用的图像生成模型 ID
+- `gitee_image_size`: 默认 `1024x1024`
+- `cover_image_style_prompt`: 封面风格要求
+
+建议使用文生图生成封面，而不是让 LLM 自行挑外链封面。正文配图仍可保留外链，但需要和章节内容强相关，并避免不可访问、热链限制、版权不清或 URL 编造的问题。
+
 ## 已知限制
 
 - 未接入真实 Astro 仓库时，无法 100% 复刻目标站点的自定义 schema

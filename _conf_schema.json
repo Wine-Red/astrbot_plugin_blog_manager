@@ -54,6 +54,40 @@
     "default": "external",
     "options": ["external", "download"]
   },
+  "cover_image_provider": {
+    "description": "封面图生成服务",
+    "type": "string",
+    "default": "",
+    "options": ["", "gitee"],
+    "hint": "设为 gitee 后，缺少封面图时会调用 Gitee 文生图接口生成本地封面资源。"
+  },
+  "gitee_image_api_key": {
+    "description": "Gitee AI API Key",
+    "type": "string",
+    "default": "",
+    "hint": "用于调用 https://ai.gitee.com/v1/images/generations。"
+  },
+  "gitee_image_base_url": {
+    "description": "Gitee AI OpenAI 兼容接口地址",
+    "type": "string",
+    "default": "https://ai.gitee.com/v1"
+  },
+  "gitee_image_model": {
+    "description": "Gitee 文生图模型名",
+    "type": "string",
+    "default": "",
+    "hint": "填写你在 Gitee AI 控制台可用的图像生成模型，例如 FLUX/Qwen-Image 类模型的实际 model id。"
+  },
+  "gitee_image_size": {
+    "description": "Gitee 文生图尺寸",
+    "type": "string",
+    "default": "1024x1024"
+  },
+  "cover_image_style_prompt": {
+    "description": "封面图风格提示词",
+    "type": "text",
+    "default": "现代中文技术博客封面，信息图风格，清晰主体，干净构图，高对比但不过度炫光，不要文字、水印、logo、二维码。"
+  },
   "site_base_url": {
     "description": "站点前缀 URL",
     "type": "string",

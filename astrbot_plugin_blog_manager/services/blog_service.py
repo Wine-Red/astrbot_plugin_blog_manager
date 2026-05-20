@@ -29,6 +29,7 @@ from ..utils.markdown import extract_markdown_links, parse_frontmatter, render_m
 from ..validators.astro_validator import AstroValidator
 from .agent_service import AgentService
 from .article_pipeline_service import ArticlePipelineService
+from .image_generation_service import ImageGenerationService
 from .publish_service import PublishService
 
 
@@ -55,6 +56,7 @@ class BlogService:
         self.pipeline_service = ArticlePipelineService(
             allow_generated_sources=bool(config.get("allow_generated_sources", False))
         )
+        self.image_generation_service = ImageGenerationService(config)
         self.publish_service = PublishService(config)
         self.adapter = AstroAdapter(config)
         self.validator = AstroValidator(config)
@@ -104,6 +106,7 @@ class BlogService:
         draft = await self.agent_service.generate_article(request, event=event)
         draft.article_path = self.adapter.build_article_path(draft)
         draft.frontmatter = build_frontmatter(self.config, request, draft)
+        await self.image_generation_service.ensure_cover_image(request, draft)
         draft.rendered_content = render_markdown_document(draft.frontmatter, draft.body)
         self._run_pipeline(request, draft)
         self._ensure_valid(draft)
@@ -172,6 +175,7 @@ class BlogService:
         if existing_frontmatter:
             draft.frontmatter = existing_frontmatter
         draft.frontmatter = build_frontmatter(self.config, request, draft)
+        await self.image_generation_service.ensure_cover_image(request, draft)
         draft.rendered_content = render_markdown_document(draft.frontmatter, draft.body)
         self._run_pipeline(request, draft)
         self._ensure_valid(draft)

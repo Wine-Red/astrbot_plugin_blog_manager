@@ -104,8 +104,9 @@ class AgentService:
             "`images` 为数组，每个元素包含 `url` 和 `alt`。\n\n"
             "图片要求：\n"
             f"- 图片偏好：{request.image_preference or 'auto'}。\n"
+            f"- 封面图策略：{self._cover_policy_text()}。\n"
             "- 图片是本次交付的一部分，不是可选装饰；生成文章时必须主动尝试为文章寻找封面图和正文配图。\n"
-            "- `image` 用作文章封面。默认必须给出 1 张与主题直接相关、可公开访问、视觉质量稳定的封面 URL。\n"
+            "- `image` 只用于外链封面模式；如果封面图策略是 AI 生成封面，`image` 必须返回空字符串，不要把外链图作为封面。\n"
             "- `images` 用作正文配图素材。默认给出 1 到 3 张，并尽量对应文章中的关键章节、产品、架构、流程或对比对象。\n"
             "- 每张图的 `alt` 必须具体描述图中内容和对应章节，不要只写“配图”“封面图”。\n"
             "- 图片来源优先级：官方产品截图/发布页首图/官方博客配图 > 架构图或文档图 > 论文图表或 GitHub 仓库图片 > 可信媒体图片。\n"
@@ -204,6 +205,7 @@ class AgentService:
     ) -> tuple[str, list[ImageAsset]]:
         normalized: list[ImageAsset] = []
         seen: set[str] = set()
+        ai_cover_enabled = self._ai_cover_enabled()
         for asset in images:
             source_url = asset.source_url.strip()
             if not source_url or source_url in seen:
@@ -215,6 +217,18 @@ class AgentService:
             normalized.append(asset)
 
         cover_image = cover_image.strip()
+        if ai_cover_enabled:
+            if cover_image and cover_image not in seen:
+                normalized.insert(
+                    0,
+                    ImageAsset(
+                        source_url=cover_image,
+                        alt_text=f"{request.topic} 正文参考图",
+                        suggested_name=f"{request.topic} 正文参考图",
+                    ),
+                )
+            return "", normalized
+
         if not cover_image and normalized:
             cover_image = normalized[0].source_url
         if cover_image and cover_image not in seen:
@@ -227,6 +241,14 @@ class AgentService:
                 ),
             )
         return cover_image, normalized
+
+    def _ai_cover_enabled(self) -> bool:
+        return str(self.config.get("cover_image_provider", "")).strip().lower() == "gitee"
+
+    def _cover_policy_text(self) -> str:
+        if self._ai_cover_enabled():
+            return "封面由插件调用 Gitee 文生图生成，你只需要提供正文外链配图。"
+        return "封面可使用可靠外链图片；没有可靠封面时返回空字符串。"
 
     def _fallback_draft(self, request: BlogGenerateRequest) -> AstroArticleDraft:
         title = request.topic.strip()
