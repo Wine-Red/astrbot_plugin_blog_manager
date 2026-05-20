@@ -42,7 +42,9 @@ from astrbot_plugin_blog_manager.tools.blog_tools import (
     format_list_summary,
     format_merge_summary,
     format_publish_summary,
+    is_admin_event,
     parse_blog_command,
+    PERMISSION_DENIED_MESSAGE,
 )
 
 
@@ -66,6 +68,7 @@ class BlogManagerPlugin(Star):
 
         logger.info("%s initialized", PLUGIN_NAME)
 
+    @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("blog")
     async def blog(self, event: AstrMessageEvent):
         """管理 Astro 博客。支持 publish、draft、list、update、merge、close、delete、check、config-check。"""
@@ -184,6 +187,9 @@ class BlogManagerPlugin(Star):
             image_preference(string): 图片偏好，可填 auto/external/download
         """
 
+        if not is_admin_event(event):
+            return PERMISSION_DENIED_MESSAGE
+
         request = build_request_from_payload(
             topic=extract_tool_string(topic),
             instructions=extract_tool_string(instructions),
@@ -213,6 +219,9 @@ class BlogManagerPlugin(Star):
             immediate_publish(boolean): 是否立即写入 GitHub 仓库
         """
 
+        if not is_admin_event(event):
+            return PERMISSION_DENIED_MESSAGE
+
         if not self.config.get("allow_auto_publish", True):
             return "当前配置未允许通过自然语言工具直接发布。"
 
@@ -240,6 +249,9 @@ class BlogManagerPlugin(Star):
             limit(number): 返回文章数量，默认 10
         """
 
+        if not is_admin_event(event):
+            return PERMISSION_DENIED_MESSAGE
+
         try:
             items = await self.blog_service.list_articles(limit=int(limit))
             return format_list_summary(items)
@@ -259,6 +271,9 @@ class BlogManagerPlugin(Star):
             target(string): 文章 slug 或完整路径
             instructions(string): 更新要求
         """
+
+        if not is_admin_event(event):
+            return PERMISSION_DENIED_MESSAGE
 
         try:
             result = await self.blog_service.update_article(
@@ -284,6 +299,9 @@ class BlogManagerPlugin(Star):
             merge_method(string): 合并方式，可填 merge/squash/rebase
         """
 
+        if not is_admin_event(event):
+            return PERMISSION_DENIED_MESSAGE
+
         try:
             result = await self.blog_service.merge_pull_request(
                 pr_number=int(pr_number),
@@ -305,6 +323,9 @@ class BlogManagerPlugin(Star):
             pr_number(number): 要关闭的 PR 编号
         """
 
+        if not is_admin_event(event):
+            return PERMISSION_DENIED_MESSAGE
+
         try:
             result = await self.blog_service.close_pull_request(pr_number=int(pr_number))
             return format_close_summary(result)
@@ -322,6 +343,9 @@ class BlogManagerPlugin(Star):
         Args:
             target(string): 文章 slug 或完整路径
         """
+
+        if not is_admin_event(event):
+            return PERMISSION_DENIED_MESSAGE
 
         try:
             result = await self.blog_service.delete_article(target=extract_tool_string(target))

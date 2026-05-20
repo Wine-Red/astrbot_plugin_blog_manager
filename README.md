@@ -18,6 +18,7 @@
 - 支持两种图片模式：
   - `external`
   - `download`
+- 权限限制：仅 AstrBot 管理员可使用 `/blog` 命令和全部 LLM Tool
 
 ## 首期限界
 

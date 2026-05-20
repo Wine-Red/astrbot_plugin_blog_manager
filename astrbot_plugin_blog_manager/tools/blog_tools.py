@@ -15,6 +15,21 @@ from ..models import (
 )
 
 
+PERMISSION_DENIED_MESSAGE = "权限不足：仅 AstrBot 管理员可以使用博客管理插件。"
+
+
+def is_admin_event(event: Any) -> bool:
+    """Return whether an AstrBot event belongs to an admin user."""
+
+    is_admin = getattr(event, "is_admin", None)
+    if callable(is_admin):
+        try:
+            return bool(is_admin())
+        except Exception:
+            return False
+    return getattr(event, "role", "") == "admin"
+
+
 def parse_blog_command(message_text: str) -> tuple[str, str]:
     """Parse `/blog <subcommand> <payload>` style text."""
 
