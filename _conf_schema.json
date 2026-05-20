@@ -84,6 +84,12 @@
     "type": "bool",
     "default": true
   },
+  "allow_generated_sources": {
+    "description": "是否允许模型正文中自行生成来源链接",
+    "type": "bool",
+    "default": false,
+    "hint": "关闭时，只有用户输入或工具确认的 URL 会被当作可核验来源，可减少瞎编参考链接。"
+  },
   "agent_system_prompt": {
     "description": "Agent 系统提示词",
     "type": "text",

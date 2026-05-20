@@ -21,7 +21,11 @@ def test_pipeline_infers_required_sources_for_news_like_topics():
 
 def test_pipeline_collects_and_scores_official_sources():
     service = ArticlePipelineService()
-    request = BlogGenerateRequest(topic="OpenAI API 发布")
+    request = BlogGenerateRequest(
+        topic="OpenAI API 发布",
+        instructions="参考来源：https://openai.com/blog/example",
+        image_preference="none",
+    )
     draft = AstroArticleDraft(
         title="OpenAI API 发布",
         description="desc",
@@ -33,14 +37,32 @@ def test_pipeline_collects_and_scores_official_sources():
 
     assert result.issues == []
     assert len(result.sources) == 1
+    assert result.sources[0].origin == "user"
     assert result.sources[0].source_type == "official"
     assert result.sources[0].reliability >= 80
     assert result.evidence[0].confidence == "high"
 
 
+def test_pipeline_rejects_draft_generated_source_links_by_default():
+    service = ArticlePipelineService()
+    request = BlogGenerateRequest(topic="OpenAI API 发布", image_preference="none")
+    draft = AstroArticleDraft(
+        title="OpenAI API 发布",
+        description="desc",
+        body="参考来源：[OpenAI 官方博客](https://openai.com/blog/example)",
+        slug="openai-api-release",
+    )
+
+    result = service.process(request, draft)
+
+    assert len(result.sources) == 1
+    assert result.sources[0].origin == "draft"
+    assert any("无法确认不是模型编造" in issue.message for issue in result.issues)
+
+
 def test_pipeline_rejects_missing_required_sources():
     service = ArticlePipelineService()
-    request = BlogGenerateRequest(topic="今日大模型 Agent 产品发布")
+    request = BlogGenerateRequest(topic="今日大模型 Agent 产品发布", image_preference="none")
     draft = AstroArticleDraft(
         title="今日大模型 Agent 产品发布",
         description="desc",
@@ -51,6 +73,36 @@ def test_pipeline_rejects_missing_required_sources():
     result = service.process(request, draft)
 
     assert any(issue.field == "source" for issue in result.issues)
+
+
+def test_pipeline_rejects_missing_required_images():
+    service = ArticlePipelineService()
+    request = BlogGenerateRequest(topic="Astro 图片发布")
+    draft = AstroArticleDraft(
+        title="Astro 图片发布",
+        description="desc",
+        body="# Hello",
+        slug="astro-image-publish",
+    )
+
+    result = service.process(request, draft)
+
+    assert any(issue.field == "image" and "至少 1 张" in issue.message for issue in result.issues)
+
+
+def test_pipeline_allows_missing_images_when_disabled():
+    service = ArticlePipelineService()
+    request = BlogGenerateRequest(topic="Astro 图片发布", image_preference="none")
+    draft = AstroArticleDraft(
+        title="Astro 图片发布",
+        description="desc",
+        body="# Hello",
+        slug="astro-image-publish",
+    )
+
+    result = service.process(request, draft)
+
+    assert not any(issue.field == "image" for issue in result.issues)
 
 
 def test_pipeline_rejects_placeholder_images():

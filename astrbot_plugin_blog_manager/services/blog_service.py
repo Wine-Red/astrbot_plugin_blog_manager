@@ -52,7 +52,9 @@ class BlogService:
         self.context = context
         self.config = config
         self.agent_service = AgentService(context, config)
-        self.pipeline_service = ArticlePipelineService()
+        self.pipeline_service = ArticlePipelineService(
+            allow_generated_sources=bool(config.get("allow_generated_sources", False))
+        )
         self.publish_service = PublishService(config)
         self.adapter = AstroAdapter(config)
         self.validator = AstroValidator(config)

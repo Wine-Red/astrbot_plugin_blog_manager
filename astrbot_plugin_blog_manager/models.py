@@ -40,6 +40,7 @@ class SourceRecord:
     title: str
     url: str
     domain: str
+    origin: str = "draft"
     source_type: str = "web"
     reliability: int = 50
     relevance: int = 50

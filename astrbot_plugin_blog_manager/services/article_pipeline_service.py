@@ -49,6 +49,9 @@ OFFICIAL_AI_DOMAINS = {
 class ArticlePipelineService:
     """Normalize article inputs and enforce non-LLM quality gates."""
 
+    def __init__(self, *, allow_generated_sources: bool = False):
+        self.allow_generated_sources = allow_generated_sources
+
     def process(
         self,
         request: BlogGenerateRequest,
@@ -99,20 +102,25 @@ class ArticlePipelineService:
     ) -> list[SourceRecord]:
         records: list[SourceRecord] = []
         seen: set[str] = set()
-        source_candidates: list[tuple[str, str]] = []
+        source_candidates: list[tuple[str, str, str]] = []
         source_candidates.extend(
-            (label, url)
-            for label, url in extract_markdown_links(f"{request.instructions}\n{draft.body}")
+            (label, url, "user")
+            for label, url in extract_markdown_links(request.instructions)
             if self._is_source_like(label, url)
         )
-        source_candidates.extend(("用户提供链接", url) for url in extract_urls(request.instructions))
+        source_candidates.extend(("用户提供链接", url, "user") for url in extract_urls(request.instructions))
+        source_candidates.extend(
+            (label, url, "draft")
+            for label, url in extract_markdown_links(draft.body)
+            if self._is_source_like(label, url)
+        )
 
-        for title, url in source_candidates:
+        for title, url, origin in source_candidates:
             normalized_url = self._normalize_url(url)
             if not normalized_url or normalized_url in seen:
                 continue
             seen.add(normalized_url)
-            records.append(self._source_record(title, normalized_url))
+            records.append(self._source_record(title, normalized_url, origin))
         return records
 
     def build_evidence(self, sources: Iterable[SourceRecord]) -> list[EvidenceItem]:
@@ -166,11 +174,12 @@ class ArticlePipelineService:
         sources: list[SourceRecord],
     ) -> list[ValidationIssue]:
         issues: list[ValidationIssue] = []
-        if spec.source_policy == "required" and not sources:
+        accepted_sources = [source for source in sources if source.accepted]
+        if spec.source_policy == "required" and not accepted_sources:
             issues.append(
                 ValidationIssue(
                     "source",
-                    "该主题需要可靠来源，但正文没有可识别的来源链接。",
+                    "该主题需要可靠来源，但没有用户提供或工具确认的可核验来源链接。",
                 )
             )
         for source in sources:
@@ -189,6 +198,13 @@ class ArticlePipelineService:
         images: list[ImageCandidate],
     ) -> list[ValidationIssue]:
         issues: list[ValidationIssue] = []
+        if spec.image_policy == "required" and not images:
+            issues.append(
+                ValidationIssue(
+                    "image",
+                    "默认需要至少 1 张封面或正文配图；如确实不需要图片，请将 image_preference 设为 none。",
+                )
+            )
         for image in images:
             if self._is_suspicious_url(image.url):
                 issues.append(
@@ -216,15 +232,13 @@ class ArticlePipelineService:
             warnings.append("正文缺少 Markdown 表格。")
         if ">" not in body:
             warnings.append("正文缺少引用块。")
-        if spec.image_policy == "required" and not images:
-            warnings.append("未识别到封面或正文配图。")
         if spec.source_policy == "required" and sources:
             low_quality = [source.url for source in sources if source.reliability < 50]
             if low_quality:
                 warnings.append("存在低可信度来源，建议替换为官方、文档、论文或可信媒体来源。")
         return warnings
 
-    def _source_record(self, title: str, url: str) -> SourceRecord:
+    def _source_record(self, title: str, url: str, origin: str) -> SourceRecord:
         parsed = urlparse(url)
         domain = parsed.netloc.lower()
         if domain.startswith("www."):
@@ -232,15 +246,22 @@ class ArticlePipelineService:
         source_type = self._source_type(domain, parsed.path)
         reliability = self._source_reliability(domain, source_type)
         accepted = not self._is_suspicious_url(url)
+        reject_reason = ""
+        if not accepted:
+            reject_reason = "疑似占位、测试或本地链接"
+        elif origin == "draft" and not self.allow_generated_sources:
+            accepted = False
+            reject_reason = "正文中的来源链接未出现在用户输入中，插件无法确认不是模型编造"
         return SourceRecord(
             title=title or domain,
             url=url,
             domain=domain,
+            origin=origin,
             source_type=source_type,
             reliability=reliability,
             relevance=60,
             accepted=accepted,
-            reject_reason="" if accepted else "疑似占位、测试或本地链接",
+            reject_reason=reject_reason,
         )
 
     def _image_candidate(self, url: str, alt: str, image_type: str) -> ImageCandidate:
