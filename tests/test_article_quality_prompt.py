@@ -16,6 +16,18 @@ def test_agent_service_build_prompt_requires_richer_article_quality():
     assert "风险与局限" in prompt
 
 
+def test_agent_service_build_prompt_includes_firefly_writing_guide():
+    service = AgentService(context=None, config={})
+    request = BlogGenerateRequest(topic="大模型 Agent 产品趋势")
+
+    prompt = service._build_prompt(request)
+
+    assert "博客写作格式指导" in prompt
+    assert "Mermaid 图表" in prompt
+    assert "提醒框" in prompt
+    assert "不要照抄示例标题、日期、URL" in prompt
+
+
 def test_agent_service_fallback_body_is_structured():
     service = AgentService(context=None, config={})
     request = BlogGenerateRequest(topic="Astro 博客自动化发布")

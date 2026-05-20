@@ -113,6 +113,17 @@
     "editor_mode": true,
     "editor_language": "json"
   },
+  "writing_guide_path": {
+    "description": "写作格式指导文件路径",
+    "type": "string",
+    "default": "",
+    "hint": "留空时默认读取插件目录下的 example.md。可填写绝对路径或相对当前工作目录的路径。"
+  },
+  "writing_guide_max_chars": {
+    "description": "写作格式指导最大注入字符数",
+    "type": "int",
+    "default": 12000
+  },
   "allow_auto_publish": {
     "description": "是否允许自然语言直接发布",
     "type": "bool",

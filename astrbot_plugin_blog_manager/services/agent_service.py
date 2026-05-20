@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any, Mapping
 
 from ..constants import DEFAULT_AGENT_SYSTEM_PROMPT, FIREFLY_FRONTMATTER_TEMPLATE_TEXT
@@ -88,6 +89,7 @@ class AgentService:
         system_prompt = str(
             self.config.get("agent_system_prompt", DEFAULT_AGENT_SYSTEM_PROMPT)
         ).strip()
+        writing_guide = self._load_writing_guide()
         prompt = (
             f"{system_prompt}\n\n"
             "请只输出 JSON，不要输出额外解释。JSON 字段必须包含："
@@ -96,6 +98,7 @@ class AgentService:
             "不要输出中文、空格或下划线。\n"
             "最终发布会使用 Firefly 博客 frontmatter 模板，请围绕下面这套字段组织内容：\n"
             f"{FIREFLY_FRONTMATTER_TEMPLATE_TEXT}\n"
+            f"{self._format_writing_guide(writing_guide)}"
             "`title`、`description`、`category`、`image` 这类字符串内容按可被 YAML 双引号包裹的方式生成，避免换行和未转义引号。\n"
             "`published` 由系统自动写入，不需要你生成。\n"
             "`category` 必须填写一个明确的中文分类，不要留空。\n"
@@ -138,6 +141,38 @@ class AgentService:
         if existing_article:
             prompt += f"\n\n以下是当前文章内容，请在此基础上更新，而不是从零重写路径：\n{existing_article}"
         return prompt
+
+    def _load_writing_guide(self) -> str:
+        guide_path = str(self.config.get("writing_guide_path", "")).strip()
+        path = Path(guide_path) if guide_path else Path(__file__).resolve().parents[1] / "example.md"
+        if not path.is_absolute():
+            path = Path.cwd() / path
+        try:
+            text = path.read_text(encoding="utf-8").strip()
+        except OSError:
+            return ""
+        max_chars = self._writing_guide_max_chars()
+        return text[:max_chars]
+
+    def _writing_guide_max_chars(self) -> int:
+        try:
+            value = int(self.config.get("writing_guide_max_chars", 12000))
+        except (TypeError, ValueError):
+            return 12000
+        return max(0, value)
+
+    def _format_writing_guide(self, writing_guide: str) -> str:
+        if not writing_guide:
+            return ""
+        return (
+            "\n博客写作格式指导（只学习格式和语法能力，不要照抄示例标题、日期、URL、仓库名或正文）：\n"
+            "```markdown\n"
+            f"{writing_guide}\n"
+            "```\n\n"
+            "生成文章时必须优先遵循这份 Firefly 写作格式指导：frontmatter 字段、slug 规则、"
+            "Markdown/MDX 兼容写法、数学公式、Mermaid 图表、提醒框、GitHub 仓库卡片和嵌入语法都按该指导使用。"
+            "只有在主题确实需要时才使用 Mermaid、公式、iframe、MDX 组件等高级语法。\n"
+        )
 
     def _parse_json_payload(self, text: str) -> dict[str, Any] | None:
         text = text.strip()

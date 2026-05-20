@@ -118,6 +118,17 @@ Hello Astro
 
 对于新闻、产品、模型、版本、价格、榜单等易变化主题，流水线会要求提供用户输入或工具确认的可核验来源链接；缺少来源时不会发布。
 
+## 写作格式指导
+
+插件会默认读取 `astrbot_plugin_blog_manager/example.md`，并把它作为 Firefly 写作格式指导注入生成提示词。该文件用于约束 frontmatter、slug、Markdown/MDX、数学公式、Mermaid、提醒框、GitHub 仓库卡片和嵌入语法等写作格式。
+
+可选配置：
+
+- `writing_guide_path`: 自定义写作格式指导文件路径；留空时使用插件目录下的 `example.md`
+- `writing_guide_max_chars`: 注入提示词的最大字符数，默认 `12000`
+
+模型只会被要求学习格式和语法能力，不应照抄指导文件里的示例标题、日期、URL 或正文。
+
 ## Gitee 文生图封面
 
 如果希望稳定获得封面图，可以启用 Gitee AI 文生图。插件会用图像生成接口生成封面，写入仓库的 `asset_dir`，并把 frontmatter `image` 指向本地资源路径；正文配图仍然可以使用 LLM 提供的可靠外链图。
